@@ -190,7 +190,7 @@ try {
       const empty = g.achGot({ v: 1, days: {}, hdays: {}, adays: {}, got: {}, ok: 0, runs: {} });
       return { n: g.ACH.length, ids: new Set(g.ACH.map((a) => a[0])).size, kinds: [0, 1, 2].map((k) => g.ACH.filter((a) => a[3] === k).length), got: g.achGot(s).sort().join(","), empty: empty.length, keys: g.ACH.every((a) => a[4] in g.tally(s)) };
     });
-    check("実績は10〜14個で、腕前・集める・続けるがどれも3つ以上・数え方が記録にある", r.n >= 10 && r.n <= 14 && r.ids === r.n && r.kinds.every((x) => x >= 3) && r.keys, JSON.stringify(r.kinds));
+    check("実績は13個で、腕前・集める・続けるがどれも3つ以上・数え方が記録にある（実績を足したらこの数も直す）", r.n === 13 && r.ids === r.n && r.kinds.every((x) => x >= 3) && r.keys, JSON.stringify(r.kinds));
     check("実績の数え方：記録から取れた実績が正しい（何も無い記録では0）", r.got === "every10,first,hard1,hardP,late1,perfect1,wind30" && r.empty === 0, r.got);
     await pa.evaluate((k) => { const g = window.__tk; localStorage.setItem(k, JSON.stringify({ v: 1, tut: true, days: {}, hdays: {}, adays: {}, got: { wind: 12 }, ok: 12, runs: {}, kofi: {} })); }, KEY);
     await pa.reload(); await pa.click("#go-ach");
@@ -198,7 +198,7 @@ try {
     await pa.close(); }
 
   // 8. カレンダーと、取りこぼした日をあとから遊ぶ（日付を5日先にして確かめる）
-  { const OFF = 5;
+  { const OFF = Number(process.env.QA_DAY_OFFSET || 5); // 月をまたぐ日は QA_DAY_OFFSET=28 で確かめる
     const pl = await browser.newPage({ viewport: { width: 390, height: 844 } });
     pl.on("pageerror", (e) => errors.push(e.stack));
     pl.on("console", (m) => { if (m.type() === "error" && !isNoise(m.text())) errors.push(m.text()); });
@@ -213,20 +213,24 @@ try {
     check("取りこぼした日は過去7日のうち遊んでいない日だけ（始めた日より前は無い・新しい順）", JSON.stringify(late) === JSON.stringify(want), late.join(","));
     check("ホームのカレンダーに、あとから遊べる日の数が出る", (await pl.textContent("#go-cal")).includes(want.length ? `▶${want.length}` : "カレンダー"));
     await pl.click("#go-cal");
-    const cell = async (k) => pl.evaluate((k) => { const e = document.querySelector(`.cal [data-k="${k}"]`); return e ? e.className + "|" + e.textContent : ""; }, k);
+    // その日の月まで戻って読み、今の月に戻す（月をまたぐ日でも同じに読む）
+    const cell = async (k) => { let back = 0; while (back < 2 && !(await pl.locator(`.cal [data-k="${k}"]`).count())) { await pl.click("#prev"); back++; } const v = await pl.evaluate((k) => { const e = document.querySelector(`.cal [data-k="${k}"]`); return e ? e.className + "|" + e.textContent : ""; }, k); for (; back > 0; back--) await pl.click("#next"); return v; };
     check("カレンダー：全問正解の日は濃い色に★3と上級の印・3問の日は★2・あとからの日は ↺", (await cell(dk(1))).includes("p3") && (await cell(dk(1))).includes("★★★") && (await cell(dk(1))).includes("上") && (await cell(dk(2))).includes("p2") && (await cell(dk(3))).includes("late") && (await cell(dk(3))).includes("↺") || dk(1).slice(0, 7) !== today.slice(0, 7));
     check("カレンダー：連続の日は1以上のときだけ小さく出し、休んだ日を責める言葉は無い", (await pl.textContent("header")).includes("連続 2日") && !/さぼ|休んだ|途切れ|残念/.test(await pl.textContent("#app")));
     check("カレンダー：前の月へ戻るボタン（始めた月より前には行かない）", (await pl.locator("#prev").count()) === 1 && (today.slice(0, 7) > "2026-11" ? !(await pl.locator("#prev").isDisabled()) : await pl.locator("#prev").isDisabled()));
     if (want.length >= 2) {
       const A = want[0], B = want[1];
-      await pl.click(`.cal .miss[data-k="${A}"]`);
+      // 月をまたぐ日でも、その日の月までカレンダーを戻してから押す（2026-11-04 CodeRabbit の指摘）
+      const showMonth = async (k) => { for (let i = 0; i < 2 && !(await pl.locator(`.cal [data-k="${k}"]`).count()); i++) await pl.click("#prev"); };
+      const openDay = async (k) => { await showMonth(k); await pl.click(`.cal .miss[data-k="${k}"]`); };
+      await openDay(A);
       const listA = await pl.evaluate(() => { const g = window.__tk, s = g.load(), m = g.mode(); return JSON.stringify(s.runs[m].list); });
       check("あとから遊ぶ問題は、その日の今日の5問と同じ（日付の種）", listA === await pl.evaluate((A) => JSON.stringify(window.__tk.dailyList(A)), A) && (await pl.evaluate(() => window.__tk.mode())) === "a:" + A);
       await ansNow(pl); await pl.click("#next"); await ansNow(pl); await pl.click("#next");
-      await pl.click("#back"); await pl.click("#go-cal");
+      await pl.click("#back"); await pl.click("#go-cal"); await showMonth(A);
       check("途中の日はカレンダーに「続き」と出る", (await cell(A)).includes("続き"));
-      await pl.click(`.cal .miss[data-k="${B}"]`); await ansNow(pl); await pl.click("#next");
-      await pl.click("#back"); await pl.click("#go-cal"); await pl.click(`.cal .miss[data-k="${A}"]`);
+      await pl.click("#back"); await pl.click("#go-cal"); await openDay(B); await ansNow(pl); await pl.click("#next");
+      await pl.click("#back"); await pl.click("#go-cal"); await openDay(A);
       check("A日を途中まで→B日を始める→A日に戻ると続きから（途中経過は日付ごと・runs.d と混ぜない）", (await curK(pl)).i === 2 && await pl.evaluate(([A, B]) => { const s = window.__tk.load(); return s.runs["a:" + A].res.length === 2 && s.runs["a:" + B].res.length === 1 && !s.runs.d; }, [A, B]));
       const before = await pl.evaluate(() => { const g = window.__tk, s = g.load(); return { days: Object.keys(s.days).length, ok: s.ok, st: g.streak(s.days) }; });
       for (let j = 0; j < 3; j++) { await ansNow(pl); await pl.click("#next"); }

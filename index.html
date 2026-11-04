@@ -245,6 +245,7 @@ function startRun(mode, opt) {
   const k = todayKey();
   save((s) => {
     if (mode !== "p" && s.runs[mode] && s.runs[mode].date === k) return; // 続きから
+    if ((mode === "d" && s.days[k]) || (mode === "h" && s.hdays[k])) return; // 別のタブで今日の分を終えていたら、もう一度は始めない（ホームに戻る）
     const list = mode === "d" ? dailyList(k) : mode === "h" ? hardList(k) : [0, 1, 2, 3, 4].map(() => ({ seed: Math.floor(Math.random() * 2 ** 31), t: opt, h: 0 }));
     s.runs[mode] = { mode, date: k, list, res: [], id: Date.now().toString(36) };
   });

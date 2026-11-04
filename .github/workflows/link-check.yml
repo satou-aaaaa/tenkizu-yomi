@@ -19,5 +19,5 @@ jobs:
   check:
     uses: satou-aaaaa/shared-workflows/.github/workflows/link-check.yml@main
     with:
-      # 調べるリンクが0件だと落ちる（lychee の failIfEmpty）。画面を JS で作るアプリは README.md なども足す
-      files: '*.html'
+      # 調べるリンクが0件だと落ちる（lychee の failIfEmpty）。画面を JS で作るアプリや、README だけの main でも0件にならないよう *.md も調べる
+      files: '*.html *.md'

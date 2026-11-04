@@ -328,7 +328,7 @@ try {
 } catch (e) {
   check("QA の操作が最後まで完了する", false, e.message.split("\n")[0]);
 } finally {
-  { // キーボードで選んだボタンに枠が出る（all:unset のカレンダーのます目でも消えない。2026-11-04 CodeRabbit の指摘）
+  try { // キーボードで選んだボタンに枠が出る（all:unset のカレンダーのます目でも消えない。2026-11-04 CodeRabbit の指摘）。止まっても失敗として記録し、レポートまで進む
     const pf = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await pf.goto(url); await pf.evaluate(() => localStorage.clear()); await pf.reload();
     await pf.click("#howto-ok").catch(() => {});
@@ -343,7 +343,8 @@ try {
       }));
     }
     check("キーボードで選んだボタン（カレンダーのあとから遊ぶ日も）に枠が出る", bad.length === 0, bad.join(","));
-    await pf.close(); }
+    await pf.close();
+  } catch (e) { check("キーボードで選んだボタン（カレンダーのあとから遊ぶ日も）に枠が出る", false, e.message.split("\n")[0]); }
   await browser.close();
 }
 check("画面のエラーが無い", errors.length === 0, errors.slice(0, 3).join(" | "));

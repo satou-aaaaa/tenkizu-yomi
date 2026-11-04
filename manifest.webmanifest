@@ -1,0 +1,17 @@
+{
+  "name": "天気図よみ",
+  "short_name": "天気図よみ",
+  "description": "天気図を読んで風と天気を当てる1日5問のクイズ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e3ecf3",
+  "theme_color": "#e3ecf3",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -226,7 +226,7 @@ function home() {
     <div class="stats"><div><b>${streak(s.days)}</b><small>連続の日</small></div><div><b>${Object.keys(s.days).length}</b><small>遊んだ日</small></div><div><b>${s.ok}</b><small>正解</small></div></div>
     <p class="rank">称号：${rankOf(s.ok)}${nr ? `（あと${nr[0] - s.ok}問で${nr[1]}）` : ""}</p>
     ${footer()}`;
-  $("go-d").onclick = () => (done ? result("d", k) : startRun("d"));
+  $("go-d").onclick = () => (k !== todayKey() ? home() : done ? result("d", k) : startRun("d")); // 画面を開いたまま0時を過ぎたら、今日の状態に描き直す
   if ($("go-h")) $("go-h").onclick = () => (hdone ? result("h", k) : k === todayKey() ? startRun("h") : home()); // 画面を開いたまま0時を過ぎたら、翌日の上級は始めない
   $("go-p").onclick = practiceMenu;
   $("go-dex").onclick = dex;
@@ -295,7 +295,8 @@ function finish() {
   const rec = { r: run.res.slice() };
   save((s2) => {
     first = bank(s2, run);
-    s2.runs[MODE] = null;
+    // 別のタブで同じモードの新しい回が始まっていたら、それは消さない
+    const c = s2.runs[MODE]; if (c && c.date === run.date && c.id === run.id) s2.runs[MODE] = null;
   });
   if (run.mode === "p") return result("p", run.date, false, { list: run.list, ...rec });
   result(run.mode, run.date, first);

@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'">
+<title>天気図よみ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="天気図を読んで、風の強さ・風向き・天気・季節を当てる1日5問のクイズ。等圧線や前線の読み方が身につきます。">
+<meta name="theme-color" content="#e3ecf3">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="天気図よみ">
+<meta property="og:title" content="天気図よみ：明日の天気、天気図から読める？">
+<meta property="og:description" content="等圧線・高気圧・前線から、風と天気を読み取る。だれでも同じ1日5問、3分で遊べます。">
+<meta property="og:url" content="https://satou-aaaaa.github.io/tenkizu-yomi/">
+<meta property="og:image" content="https://satou-aaaaa.github.io/tenkizu-yomi/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="天気図よみ：天気図を読み取るクイズ">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+<style>
+/* 紙の地図：海は淡い青、陸は生成り、通った道は朱色の線 */
+:root{
+  --bg:#e3ecf3; --paper:#fffdf7; --ink:#26323a; --ink2:#5f6f78; --line:#26323a22;
+  --land:#f6f0e1; --edge:#8a8170; --sea:#cfe1ea; --route:#d2492f; --route2:#9b3220; --go:#2f8a5b; --goal:#d2492f; --nb:#ffe7a3; --gold:#d79b2c;
+  --f-body:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-weight:500;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:460px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 28px;display:flex;flex-direction:column;gap:12px;min-height:100%;box-sizing:border-box}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:44px}
+h1{font-weight:800;font-size:21px;margin:0;letter-spacing:.04em}
+h1 small{font-size:12px;letter-spacing:0;color:var(--ink2);margin-left:8px;font-weight:500}
+.icon{all:unset;cursor:pointer;font-size:18px;min-width:44px;height:44px;display:grid;place-items:center;border-radius:12px;border:1px solid var(--line);box-sizing:border-box;padding:0 8px;background:var(--paper)}
+.icon:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--route);outline-offset:2px}
+.dots{display:flex;gap:6px;flex:1;max-width:120px}
+.dots i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.dots i.on{background:var(--route)}.dots i.done{background:var(--ink)}
+button.main,a.main{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:16px;background:var(--route);color:#fff;font-weight:800;font-size:17px;padding:0 16px;text-align:center;box-shadow:0 4px 0 var(--route2)}
+button.main:active{transform:translateY(2px);box-shadow:0 2px 0 var(--route2)}
+button.main.alt{background:#2f5d7a;box-shadow:0 4px 0 #1d3d52}
+button.sub,a.sub{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;border-radius:14px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-weight:800;font-size:15px;padding:0 12px;text-align:center}
+button.sub:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:10px}.row>.sub,.row>.main{flex:1 1 0}
+.note{color:var(--ink2);font-size:13px;line-height:1.6;margin:0;text-align:center}
+.note a{color:var(--route2)}
+/* 天気図 */
+.map{background:#f4f8fb;border-radius:16px;overflow:hidden;border:2px solid #2f5d7a33}
+.map svg{display:block;width:100%;height:auto}
+.q{font-size:18px;font-weight:800;text-align:center;margin:0;line-height:1.5}
+.ch{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ch.c8{grid-template-columns:repeat(4,1fr)}
+.ch button{all:unset;box-sizing:border-box;cursor:pointer;min-height:52px;border-radius:14px;background:var(--paper);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;text-align:center;padding:4px;box-shadow:0 3px 0 #26323a18}
+.ch.c8 button{font-size:15px}
+.ch button.ok{background:#d8f0e0;border-color:var(--go)}
+.ch button.ng{background:#fadcd5;border-color:var(--route)}
+.ch button:disabled{cursor:default}
+.why{background:var(--paper);border-left:4px solid #2f5d7a;border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.7;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;font-size:11px;color:var(--ink2)}
+.status{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--ink2);min-height:22px}
+.verdict{background:var(--paper);border:2px solid #2f5d7a;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 0 #26323a1c;animation:up .35s ease-out}
+@keyframes up{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
+.verdict .hd{display:flex;justify-content:center;align-items:baseline;gap:10px;font-size:22px;font-weight:800}
+.stars{color:var(--gold);letter-spacing:.1em;font-size:20px}
+.stars .off{color:#26323a26}
+/* ホーム */
+.title{font-weight:800;font-size:36px;letter-spacing:.06em;text-align:center;margin:4px 0 0}
+.lead{text-align:center;color:var(--ink2);margin:0;font-size:14px;line-height:1.7}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats div{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px 6px;text-align:center}
+.stats b{display:block;font-size:20px}
+.stats small{color:var(--ink2);font-size:12px}
+.rank{text-align:center;font-size:13px;color:var(--route2)}
+.share{background:var(--paper);border-radius:14px;padding:12px;white-space:pre-line;font-size:15px;line-height:1.6;text-align:center;border:1px solid var(--line)}
+.shares{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.shares a,.shares button{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:14px;font-weight:800;text-decoration:none;padding:0 6px;box-sizing:border-box;font-family:inherit;cursor:pointer}
+.big{font-weight:800;font-size:24px;text-align:center;margin:0}
+.res{display:flex;flex-direction:column;gap:6px}
+.res div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.lv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* 県帳 */
+.dex{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.dex div{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:6px 2px;text-align:center;font-size:13px;min-height:44px;display:flex;flex-direction:column;justify-content:center;box-sizing:border-box}
+.dex div small{font-size:11px;color:var(--ink2)}
+.dex .no{opacity:.45}
+dialog{border:none;border-radius:18px;background:var(--paper);color:var(--ink);max-width:400px;width:calc(100% - 32px);padding:20px;box-sizing:border-box}
+dialog::backdrop{background:#000000aa}
+dialog h2{margin:0 0 10px;letter-spacing:.06em}
+dialog ol{padding-left:1.3em;margin:0 0 12px;line-height:1.8}
+dialog p{margin:0 0 10px;font-size:14px;line-height:1.7;color:var(--ink2)}
+dialog a{color:var(--route2)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;z-index:9;box-shadow:0 6px 20px #0005;max-width:90%;text-align:center}
+footer{margin-top:auto;text-align:center;font-size:12px;color:var(--ink2);display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:center}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<dialog id="howto" aria-labelledby="howto-t">
+  <h2 id="howto-t">遊び方</h2>
+  <ol>
+    <li>天気図を見て、問題に答えます（1日5問）。</li>
+    <li>線は等圧線（同じ気圧を結んだ線、4hPaごと）。「高」は高気圧、「低」は低気圧です。</li>
+    <li>答えると、天気図の読み方の説明が出ます。</li>
+  </ol>
+  <p>前線：赤い半円は温暖前線、青い三角は寒冷前線、赤と青が交互なのは停滞前線。天気図は練習用に作った架空のものです（本物の予報ではありません）。</p>
+  <p>今日の5問はだれでも同じで1日1回。時間制限はありません。</p>
+  <p><a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
+  <button class="main" id="howto-ok" style="width:100%">わかった</button>
+</dialog>
+<script src="japan.js"></script>
+<script src="gen.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id), app = $("app");
+const SITE = "https://satou-aaaaa.github.io/tenkizu-yomi/";
+const FEEDBACK = "https://github.com/satou-aaaaa/tenkizu-yomi/issues/new?template=feedback.yml";
+const KEY = "tenkizu-v1", EPOCH = "2026-11-04";
+const G = window.TKG, M = G.M;
+
+// ---- 日付と種（日本時間。だれでも同じ5問）----
+const jstNow = () => new Date(Date.now() + 9 * 3600e3);
+const todayKey = () => jstNow().toISOString().slice(0, 10);
+const dayNo = (k) => Math.round((Date.parse(k) - Date.parse(EPOCH)) / 864e5) + 1;
+// 今日の5問：季節・風の強さ・風向き・天気・天気。上級：風向き（8方位）2問・風の強さ・天気2問（説明は最後にまとめて）
+const DAILY = ["season", "strong", "wind", "weather", "weather"], HARDT = ["wind", "strong", "wind", "weather", "weather"];
+const dailyList = (k) => DAILY.map((t, i) => ({ seed: G.seedOf(k + ":d:" + i), t, h: 0 }));
+const hardList = (k) => HARDT.map((t, i) => ({ seed: G.seedOf(k + ":h:" + i), t, h: 1 }));
+const cache = new Map();
+const qOf = (it) => { const k = it.seed + ":" + it.t + ":" + it.h; if (!cache.has(k)) cache.set(k, G.makeQ(it.seed, it.t, !!it.h)); return cache.get(k); };
+const NAME = { season: "季節", strong: "風の強さ", wind: "風向き", weather: "天気" };
+
+// ---- 記録（この端末の localStorage だけ）----
+// 進行中の遊びはモードごとに分けて持つ（練習を始めても今日・上級の途中経過を消さない）。got：問題の種類 → 正解の数
+const fresh = () => ({ v: 1, days: {}, hdays: {}, got: {}, ok: 0, runs: {}, tut: false, kofi: {} });
+let MODE = "d";
+let mem = null; // 保存できない環境では、開いているあいだだけここに置く
+// 保存に失敗したあとはメモリと保存の両方を読む。記録は合わせて数は高いほう、途中経過は同じ日・同じ問題なら進んだほう
+function load() { let a = null, b = null; try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {} if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null; if (!a || !b) return Object.assign(fresh(), a || b || {}); const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a]; const s = Object.assign(fresh(), n); for (const k in o) { if (k === "runs" || k === "t") continue; const x = o[k], y = n[k]; if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); } else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y); else if (x === true) s[k] = true; } const ra = a.runs || {}, rb = b.runs || {}, prog = (r) => (r.res ? r.res.length : 0), idOf = (r) => JSON.stringify([r.list || null, r.id || null]); s.runs = Object.assign({}, n.runs); for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) { const x = ra[m], y = rb[m]; if (!x || !y) continue; if (x.date !== y.date) s.runs[m] = x.date > y.date ? x : y; else if (idOf(x) === idOf(y)) s.runs[m] = prog(x) > prog(y) ? x : y; } return s; }
+// 保存の前に読み直す（別のタブで進めた記録を消さない）
+function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }
+const prevDay = (k) => new Date(Date.parse(k) - 864e5).toISOString().slice(0, 10);
+function streak(days) { let k = todayKey(), n = 0; if (!days[k]) k = prevDay(k); while (days[k]) { n++; k = prevDay(k); } return n; }
+const RANKS = [[0, "空を見上げる人"], [20, "天気図の読み手"], [80, "お天気博士"], [250, "予報の名人"], [600, "空の達人"]];
+const rankOf = (n) => RANKS.filter((r) => n >= r[0]).pop()[1];
+const nextRank = (n) => RANKS.find((r) => r[0] > n);
+
+// ---- 画面 ----
+const md = (k) => `${+k.slice(5, 7)}/${+k.slice(8, 10)}`;
+function toast(t) { const d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 1800); }
+const buzz = (n = 12) => { try { navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
+const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a><a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi で応援</a></footer>`;
+function bindFooter() { const h = $("f-how"); if (h) h.onclick = (e) => { e.preventDefault(); openHow(); }; }
+function openHow() { $("fb2").href = FEEDBACK; const d = $("howto"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); }
+$("howto-ok").onclick = () => { const d = $("howto"); d.close ? d.close() : d.removeAttribute("open"); save((s) => { s.tut = true; }); };
+
+// 等圧線：ます目で気圧を計り、4hPa ごとの線を引く（マーチングスクエア）
+const X0 = -70, Y0 = -30, VW = 790, VH = 680, STEP = 14;
+function isobars(m) {
+  const nx = Math.ceil(VW / STEP) + 1, ny = Math.ceil(VH / STEP) + 1, P = [];
+  for (let j = 0; j < ny; j++) { P.push([]); for (let i = 0; i < nx; i++) P[j].push(G.pressure(m, X0 + i * STEP, Y0 + j * STEP)); }
+  let lo = Infinity, hi = -Infinity; for (const r of P) for (const v of r) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  const out = [];
+  for (let lv = Math.ceil(lo / 4) * 4; lv <= hi; lv += 4) {
+    let d = "";
+    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const v = [P[j][i], P[j][i + 1], P[j + 1][i + 1], P[j + 1][i]], c = [[0, 0], [1, 0], [1, 1], [0, 1]], pts = [];
+      for (let e = 0; e < 4; e++) { const a = v[e], b = v[(e + 1) % 4]; if ((a < lv) !== (b < lv)) { const t = (lv - a) / (b - a), [ax, ay] = c[e], [bx, by] = c[(e + 1) % 4]; pts.push([X0 + (i + ax + (bx - ax) * t) * STEP, Y0 + (j + ay + (by - ay) * t) * STEP]); } }
+      for (let k = 0; k + 1 < pts.length; k += 2) d += `M${pts[k][0].toFixed(1)},${pts[k][1].toFixed(1)}L${pts[k + 1][0].toFixed(1)},${pts[k + 1][1].toFixed(1)}`;
+    }
+    out.push(`<path d="${d}" fill="none" stroke="#5b6f80" stroke-width="${lv % 20 === 0 ? 2.2 : 1.1}" stroke-linecap="round"/>`);
+  }
+  return out.join("");
+}
+function frontSvg(f) {
+  const col = { cold: "#2f6fd0", warm: "#d2492f", stay: "#d2492f" }[f.k];
+  let s = `<polyline points="${f.pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${f.k === "stay" ? "#7a5aa8" : col}" stroke-width="3.5" stroke-linejoin="round"/>`;
+  let n = 0;
+  for (let i = 1; i < f.pts.length; i++) {
+    const [ax, ay] = f.pts[i - 1], [bx, by] = f.pts[i], L = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / L, uy = (by - ay) / L, nx = uy, ny = -ux;
+    for (let t = 14; t < L - 6; t += 30, n++) {
+      const x = ax + ux * t, y = ay + uy * t, tri = f.k === "cold" || (f.k === "stay" && n % 2 === 0), side = f.k === "stay" && !tri ? -1 : 1;
+      if (tri) s += `<path d="M${x - ux * 7},${y - uy * 7}L${x + nx * 11 * side},${y + ny * 11 * side}L${x + ux * 7},${y + uy * 7}Z" fill="#2f6fd0"/>`;
+      else { const a = Math.atan2(uy, ux) * 180 / Math.PI; s += `<path d="M${x - ux * 7},${y - uy * 7}A7,7 0 0 ${side > 0 ? 1 : 0} ${x + ux * 7},${y + uy * 7}Z" fill="#d2492f"/>`; }
+    }
+  }
+  return s;
+}
+let LAND = null;
+function mapHtml(q) {
+  const m = q.map;
+  if (!LAND) LAND = M.P.map((p) => `<path d="${p[1]}"/>`).join("");
+  const centers = m.centers.filter((c) => c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH).map((c) => `<text x="${c.x}" y="${c.y}" font-size="46" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text><text x="${c.x}" y="${c.y + 38}" font-size="24" fill="#26323a" text-anchor="middle">${c.p}</text>`).join("");
+  const edge = m.centers.filter((c) => !(c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH)).map((c) => { const x = Math.max(X0 + 30, Math.min(X0 + VW - 30, c.x)), y = Math.max(Y0 + 30, Math.min(Y0 + VH - 30, c.y)); return `<text x="${x}" y="${y}" font-size="42" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text>`; }).join("");
+  const pts = (q.pts || []).map((n, i) => { const c = G.city(n); return `<circle cx="${c[1]}" cy="${c[2]}" r="11" fill="#ffd36b" stroke="#26323a" stroke-width="3"/><text x="${c[1] + 14}" y="${c[2] - 12}" font-size="32" font-weight="800" fill="#26323a" paint-order="stroke" stroke="#fff" stroke-width="5">${n}</text>`; }).join("");
+  return `<svg viewBox="${X0} ${Y0} ${VW} ${VH}" role="img" aria-label="天気図"><rect x="${X0}" y="${Y0}" width="${VW}" height="${VH}" fill="#dce9f3"/><g fill="#eadfbf" stroke="#eadfbf" stroke-width="1.5">${LAND}</g>${isobars(m)}${m.fronts.map(frontSvg).join("")}${centers}${edge}${pts}<text x="${X0 + VW - 14}" y="${Y0 + 30}" font-size="26" text-anchor="end" fill="#5b6f80">↑北</text></svg>`;
+}
+
+function home() {
+  const s = load(), k = todayKey(), done = s.days[k], hdone = s.hdays[k];
+  for (const m of ["d", "h"]) { const r = s.runs[m]; if (r && r.res.length >= r.list.length) { MODE = m; return finish(); } }
+  const nr = nextRank(s.ok);
+  const rd = s.runs.d && s.runs.d.date === k ? s.runs.d : null, rh = s.runs.h && s.runs.h.date === k ? s.runs.h : null;
+  const sample = { map: G.makeMap(G.rng(3), "冬"), pts: [] };
+  app.innerHTML = `
+    <h1 class="title">天気図よみ</h1>
+    <div class="map" aria-hidden="true">${mapHtml(sample)}</div>
+    <p class="lead">等圧線・高気圧・前線から、風と天気を読む。<br>だれでも同じ1日5問。</p>
+    ${done ? `<div class="share">今日の結果　${done.r.map(sq).join("")}</div>` : ""}
+    <button class="main" id="go-d">${done ? "今日の結果を見る" : rd ? `続きから（${rd.res.length + 1}問目）` : `今日の5問を読む <small>#${dayNo(k)}</small>`}</button>
+    ${done ? `<button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：8方位の風向きと天気の5問"}</button>` : ""}
+    <div class="row"><button class="sub" id="go-p">練習（何度でも）</button><button class="sub" id="go-dex">読めた数 ${s.ok}</button></div>
+    <div class="stats"><div><b>${streak(s.days)}</b><small>連続の日</small></div><div><b>${Object.keys(s.days).length}</b><small>遊んだ日</small></div><div><b>${s.ok}</b><small>正解</small></div></div>
+    <p class="rank">称号：${rankOf(s.ok)}${nr ? `（あと${nr[0] - s.ok}問で${nr[1]}）` : ""}</p>
+    ${footer()}`;
+  $("go-d").onclick = () => (done ? result("d", k) : startRun("d"));
+  if ($("go-h")) $("go-h").onclick = () => (hdone ? result("h", k) : startRun("h"));
+  $("go-p").onclick = practiceMenu;
+  $("go-dex").onclick = dex;
+  bindFooter();
+  if (!s.tut) openHow();
+}
+function practiceMenu() {
+  app.innerHTML = `<header><button class="icon" id="back" aria-label="もどる">←</button><h1>練習<small>今日の記録には入りません（読めた数には入ります）</small></h1><span></span></header>
+    <p class="note">問題の種類を選ぶと、5問出ます。</p>
+    <div class="lv">${Object.keys(NAME).map((t) => `<button class="sub" data-t="${t}" style="min-height:64px">${NAME[t]}</button>`).join("")}</div>${footer()}`;
+  $("back").onclick = home;
+  document.querySelectorAll(".lv button").forEach((b) => (b.onclick = () => startRun("p", b.dataset.t)));
+  bindFooter();
+}
+function startRun(mode, opt) {
+  const k = todayKey();
+  save((s) => {
+    if (mode !== "p" && s.runs[mode] && s.runs[mode].date === k) return; // 続きから
+    const list = mode === "d" ? dailyList(k) : mode === "h" ? hardList(k) : [0, 1, 2, 3, 4].map(() => ({ seed: Math.floor(Math.random() * 2 ** 31), t: opt, h: 0 }));
+    s.runs[mode] = { mode, date: k, list, res: [], id: Date.now().toString(36) };
+  });
+  MODE = mode;
+  play();
+}
+
+// 今の問題：{ i, date, id, it, q, done }
+let cur = null;
+function play() {
+  const s = load(), run = s.runs[MODE];
+  if (!run) return home();
+  const i = run.res.length;
+  if (i >= run.list.length) return finish();
+  const it = run.list[i], q = qOf(it);
+  cur = { i, date: run.date, id: run.id, it, q, done: false, hard: run.mode === "h" };
+  app.innerHTML = `
+    <header><button class="icon" id="back" aria-label="もどる">←</button>
+      <div class="dots" aria-label="${i + 1}問目／${run.list.length}問">${run.list.map((_, j) => `<i class="${j < i ? (run.res[j] ? "done" : "on") : j === i ? "on" : ""}"></i>`).join("")}</div>
+      <span style="font-size:13px;color:var(--ink2)">${run.mode === "h" ? "上級・" : run.mode === "p" ? "練習・" : ""}${NAME[it.t]} ${i + 1}/${run.list.length}</span></header>
+    <div class="map" id="mp">${mapHtml(q)}</div>
+    <div class="legend"><span><b style="color:#2f6fd0">高</b> 高気圧</span><span><b style="color:#d2492f">低</b> 低気圧</span><span>線：等圧線（4hPaごと）</span></div>
+    <p class="q">${esc(q.ask)}</p>
+    <div class="ch${q.choices.length === 8 ? " c8" : ""}" id="ch">${q.choices.map((c) => `<button data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
+    <div id="after"></div>`;
+  $("back").onclick = home;
+  $("ch").querySelectorAll("button").forEach((b) => (b.onclick = () => answer(b.dataset.c)));
+  window.scrollTo(0, 0);
+}
+const same = (r) => r && cur && r.date === cur.date && r.id === cur.id && r.res.length === cur.i;
+function answer(c) {
+  if (cur.done) return;
+  if (!same(load().runs[MODE])) { toast("別の画面で先に進んでいます"); return play(); }
+  cur.done = true;
+  const ok = c === cur.q.ans; buzz(ok ? [10, 40, 10] : 40);
+  const s = save((s) => { const r = s.runs[MODE]; if (!same(r)) return; r.res.push(ok ? 1 : 0); if (ok) { s.ok++; s.got[cur.it.t] = (s.got[cur.it.t] || 0) + 1; } });
+  $("ch").querySelectorAll("button").forEach((b) => { b.disabled = true; if (b.dataset.c === cur.q.ans) b.classList.add("ok"); else if (b.dataset.c === c) b.classList.add("ng"); });
+  const r = s.runs[MODE], fin = r && r.res.length >= r.list.length;
+  $("after").innerHTML = `<div class="verdict" role="status"><div class="hd">${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${cur.hard ? "" : `<p class="why">${esc(cur.q.why)}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
+  $("next").onclick = play;
+  setTimeout(() => { if ($("next") && cur.done) $("next").scrollIntoView({ behavior: "smooth", block: "nearest" }); }, 60);
+}
+
+function finish() {
+  const s = load(), run = s.runs[MODE];
+  if (!run) return home();
+  let first = false;
+  const rec = { r: run.res.slice() };
+  save((s2) => {
+    if (run.mode === "d" && !s2.days[run.date]) { s2.days[run.date] = rec; first = true; }
+    if (run.mode === "h" && !s2.hdays[run.date]) { s2.hdays[run.date] = rec; first = true; }
+    s2.runs[MODE] = null;
+  });
+  if (run.mode === "p") return result("p", run.date, false, { list: run.list, ...rec });
+  result(run.mode, run.date, first);
+}
+// 共有の文：問題（地名・答え）は出さない。正解🟩・はずれ🟥
+const sq = (x) => (x ? "🟩" : "🟥");
+function shareText(mode, k, rec) {
+  const n = rec.r.filter(Boolean).length;
+  return `天気図よみ${mode === "h" ? " 上級" : ""} #${dayNo(k)} ${md(k)}\n${rec.r.map(sq).join("")} ${n}/${rec.r.length}`;
+}
+function untilNext() { const n = jstNow(), ms = 864e5 - (n.getTime() % 864e5); return `${Math.floor(ms / 36e5)}時間${Math.floor((ms % 36e5) / 6e4)}分`; }
+function result(mode, k, first, prec) {
+  const s = load();
+  const list = mode === "p" ? prec.list : mode === "d" ? dailyList(k) : hardList(k);
+  const rec = mode === "p" ? prec : (mode === "d" ? s.days : s.hdays)[k];
+  if (!rec) return home();
+  const n = rec.r.filter(Boolean).length, all = n === rec.r.length, text = shareText(mode, k, rec);
+  const showKofi = first && mode !== "p" && all && !s.kofi[k + mode];
+  if (showKofi) save((s2) => { s2.kofi[k + mode] = 1; });
+  app.innerHTML = `
+    <header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>天気図よみ<small>${mode === "d" ? `今日の5問 #${dayNo(k)}` : mode === "h" ? "上級" : "練習"}</small></h1><span></span></header>
+    <p class="big">${all ? "全問正解！" : `${rec.r.length}問中 ${n}問 正解`}</p>
+    <div class="res">${list.map((it, j) => { const q = qOf(it); return `<div><span>${NAME[it.t]}：${esc(q.ask)}<br><small style="color:var(--ink2)">答え：${esc(q.ans)}${mode === "h" ? `　${esc(q.why)}` : ""}</small></span><b>${rec.r[j] ? "○" : "×"}</b></div>`; }).join("")}</div>
+    ${mode !== "p" ? `<div class="share">${esc(text)}</div>
+    <button class="main" id="share">結果をシェア</button>
+    <div class="shares"><a id="toX" target="_blank" rel="noopener">Xで投稿</a><a id="toLine" target="_blank" rel="noopener">LINEで送る</a><button id="copy">コピー</button></div>
+    <p class="note">🟩正解　🟥はずれ<br>次の5問まで あと <b>${untilNext()}</b></p>` : ""}
+    ${mode === "d" && k === todayKey() && !s.hdays[k] ? `<button class="main alt" id="go-h">上級：8方位の風向きと天気に挑む</button>` : ""}
+    <div class="row"><button class="sub" id="go-p">練習する</button><button class="sub" id="go-dex">読めた数を見る</button></div>
+    ${showKofi ? `<p class="note kofi">楽しめたら、<a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi でコーヒー1杯の応援</a>をもらえると、新しいゲームづくりの励みになります（任意・遊ぶのはずっと無料）。</p>` : ""}
+    <p class="note"><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a></p>`;
+  $("back").onclick = home;
+  $("go-p").onclick = practiceMenu;
+  $("go-dex").onclick = dex;
+  if ($("go-h")) $("go-h").onclick = () => (k === todayKey() ? startRun("h") : home()); // 画面を開いたまま0時を過ぎたら、翌日の上級は始めない
+  if (mode !== "p") {
+    const withUrl = text + "\n" + SITE;
+    $("toX").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(withUrl);
+    $("toLine").href = "https://line.me/R/share?text=" + encodeURIComponent(withUrl);
+    const copy = (t) => { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast("コピーしました"), () => toast("コピーできませんでした")); };
+    $("copy").onclick = () => copy(withUrl);
+    $("share").onclick = () => { if (navigator.share) navigator.share({ text: withUrl }).catch(() => {}); else copy(withUrl); };
+  }
+}
+
+function dex() {
+  const s = load();
+  app.innerHTML = `
+    <header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>読めた数<small>正解 ${s.ok}問</small></h1><span></span></header>
+    <p class="note">問題の種類ごとの正解の数です。</p>
+    <div class="res">${Object.keys(NAME).map((t) => `<div><span>${NAME[t]}</span><b>${s.got[t] || 0}問</b></div>`).join("")}</div>
+    ${footer()}`;
+  $("back").onclick = home;
+  bindFooter();
+}
+
+window.__tk = { mode: () => MODE, G, dailyList, hardList, qOf, todayKey, dayNo, shareText, streak, load, cur: () => cur, answer: (c) => answer(c), play: (m) => { if (m) MODE = m; play(); } };
+home();
+if ("serviceWorker" in navigator && location.protocol === "https:" && /github\.io$/.test(location.hostname)) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>

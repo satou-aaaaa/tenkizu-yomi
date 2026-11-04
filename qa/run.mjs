@@ -111,8 +111,10 @@ try {
   await page.click("#howto-ok");
   await page.click("#go-d");
   let c = await curK(page);
+  check("答える前は、天気図に風の矢印を出さない（答えを言わない）", (await page.locator("#wl").count()) === 0 && await page.locator("#wleg").isHidden());
   check("1問目は季節：天気図・問題・4つの答えが出る", c.q.t === "season" && (await page.locator("#ch button").count()) === 4 && (await page.locator("#mp svg").count()) === 1);
   await ansNow(page, false);
+  check("答えたあと、天気図に風の矢印を重ねる（流れが見える）", (await page.locator("#wl path").count()) >= 1 && (await page.getAttribute("#wl path", "d")).split("M").length > 20 && await page.locator("#wleg").isVisible());
   check("まちがえると答えに色が付き、説明が出る", (await page.locator("#ch button.ng").count()) === 1 && (await page.locator("#ch button.ok").count()) === 1 && (await page.locator(".why").count()) === 1);
   await page.click("#next");
   c = await curK(page);
@@ -134,6 +136,7 @@ try {
   check("5問で結果・シェアの文は番号と色と点だけ（地名を出さない）", /天気図よみ #\d+/.test(share) && /🟥🟩🟩🟩🟩 4\/5/.test(share) && !asks.some((p) => share.includes(p)));
   check("X・LINE は押したときに開くリンクだけ", /^https:\/\/twitter\.com\/intent\/tweet\?text=/.test(await page.getAttribute("#toX", "href")) && /^https:\/\/line\.me\/R\/share\?text=/.test(await page.getAttribute("#toLine", "href")));
   check("結果に5問の答えが出る", (await page.locator(".res div").count()) === 5);
+  check("今日の5問を初めて終えると、結果に「🏅 実績：はじめの1枚」が小さく出る", ((await page.locator("#achnew").textContent().catch(() => "")) || "").includes("🏅 実績：はじめの1枚"));
   check("全問正解でない日は Ko-fi のひとことを出さない", (await page.locator(".kofi").count()) === 0);
   await page.click("#back");
   check("ホームで連続1日・今日の結果を見るに変わる・正解4", (await page.textContent(".stats")).includes("1連続の日") && (await page.textContent(".stats")).includes("4正解") && (await page.textContent("#go-d")).includes("結果"));
@@ -156,6 +159,100 @@ try {
   check("読めた数に種類ごとの正解が出る", (await page.locator(".res div").count()) === 4);
   await page.close();
 
+
+  // 6. 答えたあとの風の矢印：答えと同じ計算から描く（何百問で、太い矢印の向き＝答えの方角）
+  { const pw = await newPage();
+    const r = await pw.evaluate(() => {
+      const g = window.__tk, D8 = g.G.DIR8, bad = []; let n = 0, wx = 0, wxBad = 0;
+      for (let d = 0; d < 300; d++) {
+        const k = new Date(Date.parse("2026-11-04") + d * 864e5).toISOString().slice(0, 10);
+        for (const it of [...g.dailyList(k), ...g.hardList(k)]) {
+          const q = g.qOf(it), html = g.windLayer(q);
+          if (q.t === "wind") {
+            const m = html.match(/class="wb" d="M([-\d.]+),([-\d.]+)L([-\d.]+),([-\d.]+)/); if (!m) { bad.push(k + " 矢印なし"); continue; }
+            const [x0, y0, x1, y1] = m.slice(1).map(Number), deg = (Math.atan2(x0 - x1, -(y0 - y1)) * 180 / Math.PI + 360) % 360; // 矢印の根もと＝吹いてくる側
+            if (D8[Math.round(deg / 45) % 8] !== q.ans) bad.push(`${k} ${q.ans}→${D8[Math.round(deg / 45) % 8]}`); n++;
+          }
+          if (q.t === "weather") { wx++; if (!html.includes({ 晴れ: "☀", 雨: "☂", 雪: "❄" }[q.ans])) wxBad++; }
+          if (q.t === "strong") { const m = html.match(/class="wb" d="([^"]+)"/); if (!m || m[1].split("M").length !== 5) bad.push(k + " 強さの矢印"); }
+        }
+      }
+      return { bad, n, wx, wxBad };
+    });
+    check(`答えたあとの太い矢印の向きは答えの方角と同じ・風の強さは2地点に矢印・天気は答えの印（${r.n}問）`, r.bad.length === 0 && r.n > 300 && r.wxBad === 0 && r.wx > 500, r.bad.slice(0, 3).join(","));
+    await pw.close(); }
+
+  // 7. 実績：いまの記録から数える
+  { const pa = await newPage();
+    const r = await pa.evaluate(() => {
+      const g = window.__tk, five = (x) => ({ r: x });
+      const s = { v: 1, days: { "2026-11-05": five([1, 1, 1, 1, 1]), "2026-11-06": five([1, 0, 1, 1, 1]) }, hdays: { "2026-11-05": five([1, 1, 1, 1, 1]) }, adays: { "2026-11-04": five([0, 0, 1, 1, 1]) }, got: { season: 10, strong: 10, wind: 30, weather: 12 }, ok: 62, runs: {}, kofi: {} };
+      const empty = g.achGot({ v: 1, days: {}, hdays: {}, adays: {}, got: {}, ok: 0, runs: {} });
+      return { n: g.ACH.length, ids: new Set(g.ACH.map((a) => a[0])).size, kinds: [0, 1, 2].map((k) => g.ACH.filter((a) => a[3] === k).length), got: g.achGot(s).sort().join(","), empty: empty.length, keys: g.ACH.every((a) => a[4] in g.tally(s)) };
+    });
+    check("実績は10〜14個で、腕前・集める・続けるがどれも3つ以上・数え方が記録にある", r.n >= 10 && r.n <= 14 && r.ids === r.n && r.kinds.every((x) => x >= 3) && r.keys, JSON.stringify(r.kinds));
+    check("実績の数え方：記録から取れた実績が正しい（何も無い記録では0）", r.got === "every10,first,hard1,hardP,late1,perfect1,wind30" && r.empty === 0, r.got);
+    await pa.evaluate((k) => { const g = window.__tk; localStorage.setItem(k, JSON.stringify({ v: 1, tut: true, days: {}, hdays: {}, adays: {}, got: { wind: 12 }, ok: 12, runs: {}, kofi: {} })); }, KEY);
+    await pa.reload(); await pa.click("#go-ach");
+    check("実績の画面：まだの実績は条件と進み具合（12/30）を出す", (await pa.locator(".ach").count()) === r.n && (await pa.textContent(".ach[data-id=wind30]")).includes("12/30") && (await pa.locator(".ach[data-id=wind30] .bar").count()) === 1);
+    await pa.close(); }
+
+  // 8. カレンダーと、取りこぼした日をあとから遊ぶ（日付を5日先にして確かめる）
+  { const OFF = 5;
+    const pl = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    pl.on("pageerror", (e) => errors.push(e.stack));
+    pl.on("console", (m) => { if (m.type() === "error" && !isNoise(m.text())) errors.push(m.text()); });
+    await pl.addInitScript((off) => { const RD = Date, o = off * 864e5; window.Date = class extends RD { constructor(...a) { if (a.length) super(...a); else super(RD.now() + o); } static now() { return RD.now() + o; } }; }, OFF);
+    await pl.goto(url);
+    const today = await pl.evaluate(() => window.__tk.todayKey()), dk = (n) => new Date(Date.parse(today) - n * 864e5).toISOString().slice(0, 10);
+    // 1日前は全問正解・2日前は3問・3日前はあとから済み。4日前より前（始めた日まで）は取りこぼし
+    await pl.evaluate(([k, a, b, c]) => { localStorage.setItem(k, JSON.stringify({ v: 1, tut: true, days: { [a]: { r: [1, 1, 1, 1, 1] }, [b]: { r: [1, 1, 0, 1, 0] } }, hdays: { [a]: { r: [1, 1, 1, 1, 1] } }, adays: { [c]: { r: [1, 1, 1, 1, 1] } }, got: {}, ok: 0, runs: {}, kofi: {} })); }, [KEY, dk(1), dk(2), dk(3)]);
+    await pl.reload();
+    const late = await pl.evaluate(() => window.__tk.lateDays(window.__tk.load()));
+    const want = []; for (let n = 4; n <= 7; n++) if (dk(n) >= "2026-11-04") want.push(dk(n));
+    check("取りこぼした日は過去7日のうち遊んでいない日だけ（始めた日より前は無い・新しい順）", JSON.stringify(late) === JSON.stringify(want), late.join(","));
+    check("ホームのカレンダーに、あとから遊べる日の数が出る", (await pl.textContent("#go-cal")).includes(want.length ? `▶${want.length}` : "カレンダー"));
+    await pl.click("#go-cal");
+    const cell = async (k) => pl.evaluate((k) => { const e = document.querySelector(`.cal [data-k="${k}"]`); return e ? e.className + "|" + e.textContent : ""; }, k);
+    check("カレンダー：全問正解の日は濃い色に★3と上級の印・3問の日は★2・あとからの日は ↺", (await cell(dk(1))).includes("p3") && (await cell(dk(1))).includes("★★★") && (await cell(dk(1))).includes("上") && (await cell(dk(2))).includes("p2") && (await cell(dk(3))).includes("late") && (await cell(dk(3))).includes("↺") || dk(1).slice(0, 7) !== today.slice(0, 7));
+    check("カレンダー：連続の日は1以上のときだけ小さく出し、休んだ日を責める言葉は無い", (await pl.textContent("header")).includes("連続 2日") && !/さぼ|休んだ|途切れ|残念/.test(await pl.textContent("#app")));
+    check("カレンダー：前の月へ戻るボタン（始めた月より前には行かない）", (await pl.locator("#prev").count()) === 1 && (today.slice(0, 7) > "2026-11" ? !(await pl.locator("#prev").isDisabled()) : await pl.locator("#prev").isDisabled()));
+    if (want.length >= 2) {
+      const A = want[0], B = want[1];
+      await pl.click(`.cal .miss[data-k="${A}"]`);
+      const listA = await pl.evaluate(() => { const g = window.__tk, s = g.load(), m = g.mode(); return JSON.stringify(s.runs[m].list); });
+      check("あとから遊ぶ問題は、その日の今日の5問と同じ（日付の種）", listA === await pl.evaluate((A) => JSON.stringify(window.__tk.dailyList(A)), A) && (await pl.evaluate(() => window.__tk.mode())) === "a:" + A);
+      await ansNow(pl); await pl.click("#next"); await ansNow(pl); await pl.click("#next");
+      await pl.click("#back"); await pl.click("#go-cal");
+      check("途中の日はカレンダーに「続き」と出る", (await cell(A)).includes("続き"));
+      await pl.click(`.cal .miss[data-k="${B}"]`); await ansNow(pl); await pl.click("#next");
+      await pl.click("#back"); await pl.click("#go-cal"); await pl.click(`.cal .miss[data-k="${A}"]`);
+      check("A日を途中まで→B日を始める→A日に戻ると続きから（途中経過は日付ごと・runs.d と混ぜない）", (await curK(pl)).i === 2 && await pl.evaluate(([A, B]) => { const s = window.__tk.load(); return s.runs["a:" + A].res.length === 2 && s.runs["a:" + B].res.length === 1 && !s.runs.d; }, [A, B]));
+      const before = await pl.evaluate(() => { const g = window.__tk, s = g.load(); return { days: Object.keys(s.days).length, ok: s.ok, st: g.streak(s.days) }; });
+      for (let j = 0; j < 3; j++) { await ansNow(pl); await pl.click("#next"); }
+      const after = await pl.evaluate((A) => { const g = window.__tk, s = g.load(); return { days: Object.keys(s.days).length, a: !!s.adays[A], ok: s.ok, st: g.streak(s.days), run: s.runs["a:" + A], kofi: Object.keys(s.kofi).length }; }, A);
+      check("あとから遊んだ日は adays に残り、今日の記録・連続の日・Ko-fi に数えない（読めた数には入る）", after.a && after.days === before.days && after.st === before.st && after.ok === before.ok + 3 && !after.run && after.kofi === 0);
+      check("あとからの結果にはシェアと Ko-fi を出さず、カレンダーへ戻れる", (await pl.locator("#share").count()) === 0 && (await pl.locator(".kofi").count()) === 0 && (await pl.locator("#go-cal").count()) === 1 && (await pl.textContent("header")).includes("あとから"));
+      await pl.click("#go-cal");
+      check("あとから遊んだ日はカレンダーに ↺ で残る", (await cell(A)).includes("late"));
+    } else check("あとから遊ぶ日が2日以上ある（検査の前提）", false, want.join(","));
+    await pl.close(); }
+  { // 取りこぼした日の決め方と問題を、何百日分も作って確かめる
+    const pz = await newPage();
+    const r = await pz.evaluate(() => {
+      const g = window.__tk, bad = [];
+      for (let n = 0; n < 400; n++) {
+        const k = new Date(Date.parse("2026-11-04") + n * 864e5).toISOString().slice(0, 10), days = {};
+        for (let j = 1; j <= 7; j++) if ((n * 7 + j) % 3 === 0) days[new Date(Date.parse(k) - j * 864e5).toISOString().slice(0, 10)] = { r: [1] };
+        const L = g.lateDays({ days, adays: {} }, k);
+        if (L.length > 7 || L.some((d) => d >= k || d < "2026-11-04" || days[d] || Date.parse(k) - Date.parse(d) > 7 * 864e5)) bad.push(k);
+        for (const d of L) if (g.dailyList(d).map(g.qOf).some((q) => !q) || JSON.stringify(g.dailyList(d)) !== JSON.stringify(g.dailyList(d))) bad.push(d);
+      }
+      return bad;
+    });
+    check("取りこぼした日の選び方とその日の問題（400日分）：過去7日・遊んだ日を除く・どの日も5問できる", r.length === 0, r.slice(0, 3).join(","));
+    check("保存に失敗したあとの統合で、片方にしか無い adays を失わない（先に fresh() で補う）", await pz.evaluate((K) => { const g = window.__tk, s0 = g.load(); const x = Object.assign({}, s0, { t: 9 }); delete x.adays; mem = JSON.stringify(x); localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: 5, adays: { "2000-01-01": { r: [1] } } }))); const r = g.load(); mem = null; return !!r.adays["2000-01-01"]; }, KEY));
+    await pz.close(); }
   // 5. スマホ幅：はみ出さない・押せる所は44px以上・地図の字が読める
   for (const w of [320, 390]) {
     const p3 = await newPage(w, 700); const fb2 = await p3.evaluate(() => { const a = document.querySelector("#howto #fb2"); return a ? a.getBoundingClientRect().height : 0; }); check(`幅${w}px：遊び方の「感想を送る」も高さ44px以上`, fb2 >= 44, `${fb2}px`); await p3.click("#howto-ok");
@@ -164,6 +261,14 @@ try {
     const r = await p3.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), fs: Math.min(...[...document.querySelectorAll("#mp text")].map((t) => t.getBoundingClientRect().height)) }));
     check(`幅${w}px：横にはみ出さず、押せる所は高さ44px以上・地図の字は9px以上`, homeOk && !r.over && r.small.length === 0 && r.fs >= 9, `${r.small.join(",")} 字${r.fs.toFixed(1)}px`);
     await p3.close();
+  }
+  for (const w of [320, 390]) { // 実績・カレンダーの画面もスマホ幅で崩れない
+    const pv = await newPage(w, 700); await pv.click("#howto-ok");
+    const look = () => pv.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), out: [...document.querySelectorAll(".ach, .cal .c")].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length }));
+    await pv.click("#go-ach"); const a = await look();
+    await pv.click("#back"); await pv.click("#go-cal"); const c = await look();
+    check(`幅${w}px：実績とカレンダーの画面は横にはみ出さず、押せる所は高さ44px以上`, !a.over && !c.over && a.small.length + c.small.length === 0 && a.out + c.out === 0, [...a.small, ...c.small].join(","));
+    await pv.close();
   }
   { // 上級の8方位も幅320pxで押せる
     const p8 = await newPage(320, 700); await p8.click("#howto-ok");

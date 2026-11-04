@@ -215,7 +215,7 @@ try {
     await pl.click("#go-cal");
     // その日の月まで戻って読み、今の月に戻す（月をまたぐ日でも同じに読む）
     const cell = async (k) => { let back = 0; while (back < 2 && !(await pl.locator(`.cal [data-k="${k}"]`).count())) { await pl.click("#prev"); back++; } const v = await pl.evaluate((k) => { const e = document.querySelector(`.cal [data-k="${k}"]`); return e ? e.className + "|" + e.textContent : ""; }, k); for (; back > 0; back--) await pl.click("#next"); return v; };
-    check("カレンダー：全問正解の日は濃い色に★3と上級の印・3問の日は★2・あとからの日は ↺", (await cell(dk(1))).includes("p3") && (await cell(dk(1))).includes("★★★") && (await cell(dk(1))).includes("上") && (await cell(dk(2))).includes("p2") && (await cell(dk(3))).includes("late") && (await cell(dk(3))).includes("↺") || dk(1).slice(0, 7) !== today.slice(0, 7));
+    check("カレンダー：全問正解の日は濃い色に★3と上級の印・3問の日は★2・あとからの日は ↺", (await cell(dk(1))).includes("p3") && (await cell(dk(1))).includes("★★★") && (await cell(dk(1))).includes("上") && (await cell(dk(2))).includes("p2") && (await cell(dk(3))).includes("late") && (await cell(dk(3))).includes("↺"));
     check("カレンダー：連続の日は1以上のときだけ小さく出し、休んだ日を責める言葉は無い", (await pl.textContent("header")).includes("連続 2日") && !/さぼ|休んだ|途切れ|残念/.test(await pl.textContent("#app")));
     check("カレンダー：前の月へ戻るボタン（始めた月より前には行かない）", (await pl.locator("#prev").count()) === 1 && (today.slice(0, 7) > "2026-11" ? !(await pl.locator("#prev").isDisabled()) : await pl.locator("#prev").isDisabled()));
     if (want.length >= 2) {
@@ -256,6 +256,9 @@ try {
     });
     check("取りこぼした日の選び方とその日の問題（400日分）：過去7日・遊んだ日を除く・どの日も5問できる", r.length === 0, r.slice(0, 3).join(","));
     check("保存に失敗したあとの統合で、片方にしか無い adays を失わない（先に fresh() で補う）", await pz.evaluate((K) => { const g = window.__tk, s0 = g.load(); const x = Object.assign({}, s0, { t: 9 }); delete x.adays; mem = JSON.stringify(x); localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: 5, adays: { "2000-01-01": { r: [1] } } }))); const r = g.load(); mem = null; return !!r.adays["2000-01-01"]; }, KEY));
+    check("同じ日に今日の5問とあとからの記録があれば、統合で今日の5問を残す（二重に数えない）", await pz.evaluate((K) => { const g = window.__tk, s0 = g.load(); localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: 5, days: { "2000-01-02": { r: [1] } }, adays: { "2000-01-02": { r: [1] }, "2000-01-03": { r: [1] } } }))); const r = g.load(); return !!r.days["2000-01-02"] && !r.adays["2000-01-02"] && !!r.adays["2000-01-03"]; }, KEY));
+    const dupView = await pz.evaluate((K) => { const g = window.__tk, D = "2000-01-04", s0 = g.load(); localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: 6, days: { [D]: { r: [1, 1, 1, 1, 1] } }, adays: {}, runs: { ["a:" + D]: { mode: "a", date: D, list: g.dailyList(D), res: [1, 0, 1, 1, 1], id: "dup", a0: [] } } }))); g.play("a:" + D); const s = g.load(); return { text: document.querySelector("#app").textContent, saved: !!s.adays[D], run: !!s.runs["a:" + D] }; }, KEY);
+    check("あとからの回が記録されなかったとき（同じ日の今日の5問が先）も結果を見せ、記録はしない", dupView.text.includes("5問中 4問") && dupView.text.includes("記録には残しません") && !dupView.saved && !dupView.run, JSON.stringify({ ...dupView, text: dupView.text.slice(0, 60) }));
     await pz.close(); }
   // 5. スマホ幅：はみ出さない・押せる所は44px以上・地図の字が読める
   for (const w of [320, 390]) {

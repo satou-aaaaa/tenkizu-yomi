@@ -187,8 +187,10 @@ const doneOf = (r) => !!r && r.res.length >= r.list.length, recOf = (r) => ({ r:
 // 終わった今日・上級の回を日ごとの記録に入れる（結果を見る前に別のタブが次の日を保存しても、終えた日を失わない）
 const runKey = (mode, date) => (mode === "a" ? "a:" + date : mode); // 途中経過の入れ物の名前（あとからは日付ごと）
 const bookOf = (s, m) => (m === "d" ? s.days : m === "h" ? s.hdays : m === "a" ? (s.adays = s.adays || {}) : null);
-function bank(s, r) { const b = doneOf(r) ? bookOf(s, r.mode) : null; if (!b || b[r.date] || (r.mode === "a" && s.days[r.date])) return false; b[r.date] = recOf(r); return true; }
-function load() { let a = null, b = null; try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {} if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null; if (!a || !b) return Object.assign(fresh(), a || b || {}); a = Object.assign(fresh(), a); b = Object.assign(fresh(), b); const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a]; const s = Object.assign(fresh(), n); for (const k in o) { if (k === "runs" || k === "t") continue; const x = o[k], y = n[k]; if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); } else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y); else if (x === true) s[k] = true; } const ra = a.runs || {}, rb = b.runs || {}, prog = (r) => (r.res ? r.res.length : 0), idOf = (r) => JSON.stringify([r.list || null, r.id || null]); s.runs = Object.assign({}, n.runs); for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) { const x = ra[m], y = rb[m]; if (x === undefined || y === undefined) { if (x || y) s.runs[m] = x || y; continue; } if (!x || !y) { const r = x || y; if (!r || bank(s, r) || doneOf(r)) continue; const bd = bookOf(s, r.mode); if (bd && !bd[r.date]) s.runs[m] = r; continue; } if (x.date !== y.date) { const [w, l] = x.date > y.date ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; } else if (idOf(x) === idOf(y)) { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; } } return s; }
+function bank(s, r) { const b = doneOf(r) ? bookOf(s, r.mode) : null; if (!b || b[r.date] || (r.mode === "a" && s.days[r.date])) return false; if (r.mode === "d") delete s.adays[r.date]; b[r.date] = recOf(r); return true; }
+// 同じ日に今日の5問とあとからの両方があれば、今日の5問を残す（0時をまたいだ別のタブで二重に数えない）
+const preferDays = (s) => { s.adays = s.adays || {}; for (const d in s.days) delete s.adays[d]; return s; };
+function load() { let a = null, b = null; try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {} if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null; if (!a || !b) return preferDays(Object.assign(fresh(), a || b || {})); a = Object.assign(fresh(), a); b = Object.assign(fresh(), b); const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a]; const s = Object.assign(fresh(), n); for (const k in o) { if (k === "runs" || k === "t") continue; const x = o[k], y = n[k]; if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); } else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y); else if (x === true) s[k] = true; } const ra = a.runs || {}, rb = b.runs || {}, prog = (r) => (r.res ? r.res.length : 0), idOf = (r) => JSON.stringify([r.list || null, r.id || null]); s.runs = Object.assign({}, n.runs); for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) { const x = ra[m], y = rb[m]; if (x === undefined || y === undefined) { if (x || y) s.runs[m] = x || y; continue; } if (!x || !y) { const r = x || y; if (!r || bank(s, r) || doneOf(r)) continue; const bd = bookOf(s, r.mode); if (bd && !bd[r.date]) s.runs[m] = r; continue; } if (x.date !== y.date) { const [w, l] = x.date > y.date ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; } else if (idOf(x) === idOf(y)) { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; } } return preferDays(s); }
 // 保存の前に読み直す（別のタブで進めた記録を消さない）
 function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }
 const prevDay = (k) => new Date(Date.parse(k) - 864e5).toISOString().slice(0, 10);
@@ -411,6 +413,8 @@ function finish() {
     if (Array.isArray(run.a0)) newAch = achGot(s2).filter((id) => !run.a0.includes(id));
   });
   if (run.mode === "p") return result("p", run.date, false, { list: run.list, ...rec }, newAch);
+  // あとからの回が記録されなかった（同じ日の今日の5問が先に終わっていた）ときも、答えた結果は見せる（記録はしない）
+  if (run.mode === "a" && !first && !(load().adays || {})[run.date]) return result("a", run.date, false, rec, newAch);
   result(run.mode, run.date, first, null, newAch);
 }
 // 共有の文：問題（地名・答え）は出さない。正解🟩・はずれ🟥
@@ -423,7 +427,7 @@ function untilNext() { const n = jstNow(), ms = 864e5 - (n.getTime() % 864e5); r
 function result(mode, k, first, prec, newAch = []) {
   const s = load();
   const list = mode === "p" ? prec.list : mode === "d" || mode === "a" ? dailyList(k) : hardList(k);
-  const rec = mode === "p" ? prec : bookOf(s, mode)[k];
+  const rec = prec || bookOf(s, mode)[k], unsaved = mode === "a" && !!prec;
   if (!rec) return home();
   const n = rec.r.filter(Boolean).length, all = n === rec.r.length, text = shareText(mode, k, rec), late = mode === "a";
   const showKofi = first && mode !== "p" && !late && all && !s.kofi[k + mode]; // あとから遊んだ日には出さない
@@ -433,7 +437,7 @@ function result(mode, k, first, prec, newAch = []) {
     <p class="big">${all ? "全問正解！" : `${rec.r.length}問中 ${n}問 正解`}</p>
     ${newAch.length ? `<p class="achnew" id="achnew">${newAch.map((id) => `🏅 実績：${ACH.find((a) => a[0] === id)[1]}`).join("<br>")}</p>` : ""}
     <div class="res">${list.map((it, j) => { const q = qOf(it); return `<div><span>${NAME[it.t]}：${esc(q.ask)}<br><small style="color:var(--ink2)">答え：${esc(q.ans)}${mode === "h" ? `　${esc(q.why)}` : ""}</small></span><b>${rec.r[j] ? "○" : "×"}</b></div>`; }).join("")}</div>
-    ${late ? `<p class="note">あとから遊んだ日は、カレンダーに ↺ で残ります（連続の日には数えません）。</p><button class="main alt" id="go-cal">カレンダーへ</button>` : ""}
+    ${late ? `<p class="note">${unsaved ? "この日は今日の5問の記録があるので、あとからの記録には残しません。" : "あとから遊んだ日は、カレンダーに ↺ で残ります（連続の日には数えません）。"}</p><button class="main alt" id="go-cal">カレンダーへ</button>` : ""}
     ${mode !== "p" && !late ? `<div class="share">${esc(text)}</div>
     <button class="main" id="share">結果をシェア</button>
     <div class="shares"><a id="toX" target="_blank" rel="noopener">Xで投稿</a><a id="toLine" target="_blank" rel="noopener">LINEで送る</a><button id="copy">コピー</button></div>

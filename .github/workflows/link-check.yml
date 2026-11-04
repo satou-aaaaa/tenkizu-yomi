@@ -21,3 +21,5 @@ jobs:
     with:
       # 調べるリンクが0件だと落ちる（lychee の failIfEmpty）。画面を JS で作るアプリや、README だけの main でも0件にならないよう *.md も調べる
       files: '*.html *.md'
+      # 自分たちの公開ページ（*.github.io）は各リポジトリの site-watch が毎日見張る。初めて公開する前の PR では 404 になるので、ここでは調べない
+      exclude: '^https://satou-aaaaa\.github\.io/'

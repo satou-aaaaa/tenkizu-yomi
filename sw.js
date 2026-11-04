@@ -20,7 +20,8 @@ self.addEventListener("fetch", (e) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
   const fromCache = () => caches.match(req, { ignoreSearch: true })
-    .then((hit) => hit || (req.mode === "navigate" ? caches.match("./index.html") : undefined));
+    .then((hit) => hit || (req.mode === "navigate" ? caches.match("./index.html") : undefined))
+    .catch(() => undefined); // 保存したものを読めなくても、必ず返事を返す（ネットの返事か Response.error()）
   // ネットの返事と保存し直しは、イベントの中で waitUntil に預ける（4秒で保存したものを返したあとに届いても、新しい版を保存できる）
   const net = fetch(req);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));

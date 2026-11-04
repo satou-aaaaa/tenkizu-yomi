@@ -324,6 +324,22 @@ try {
 } catch (e) {
   check("QA の操作が最後まで完了する", false, e.message.split("\n")[0]);
 } finally {
+  { // キーボードで選んだボタンに枠が出る（all:unset のカレンダーのます目でも消えない。2026-11-04 CodeRabbit の指摘）
+    const pf = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await pf.goto(url); await pf.evaluate(() => localStorage.clear()); await pf.reload();
+    await pf.click("#howto-ok").catch(() => {});
+    const bad = [];
+    for (const open of [null, "#go-cal"]) {
+      if (open) await pf.click(open);
+      await pf.keyboard.press("Shift");
+      bad.push(...await pf.evaluate(() => {
+        const cal = document.querySelector(".cal");
+        if (cal) { const b = document.createElement("button"); b.className = (cal.querySelector("button") || cal.lastElementChild).className + " miss"; b.textContent = "1"; cal.append(b); }
+        return [...document.querySelectorAll("button:not([disabled]),a[href]")].filter((b) => b.checkVisibility()).filter((b) => { b.focus(); const cs = getComputedStyle(b); return !b.matches(":focus-visible") || cs.outlineStyle === "none" || parseFloat(cs.outlineWidth) < 2; }).map((b) => b.className || b.id || b.tagName);
+      }));
+    }
+    check("キーボードで選んだボタン（カレンダーのあとから遊ぶ日も）に枠が出る", bad.length === 0, bad.join(","));
+    await pf.close(); }
   await browser.close();
 }
 check("画面のエラーが無い", errors.length === 0, errors.slice(0, 3).join(" | "));

@@ -39,7 +39,6 @@ header{display:flex;justify-content:space-between;align-items:center;gap:8px;min
 h1{font-weight:800;font-size:21px;margin:0;letter-spacing:.04em}
 h1 small{font-size:12px;letter-spacing:0;color:var(--ink2);margin-left:8px;font-weight:500}
 .icon{all:unset;cursor:pointer;font-size:18px;min-width:44px;height:44px;display:grid;place-items:center;border-radius:12px;border:1px solid var(--line);box-sizing:border-box;padding:0 8px;background:var(--paper)}
-.icon:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--route);outline-offset:2px}
 .dots{display:flex;gap:6px;flex:1;max-width:120px}
 .dots i{flex:1;height:6px;border-radius:3px;background:var(--line)}
 .dots i.on{background:var(--route)}.dots i.done{background:var(--ink)}
@@ -137,6 +136,8 @@ footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:cente
 @media (max-width:360px){.row>.sub{font-size:14px;padding:0 8px}}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* all:unset のボタン（カレンダーのます目など）でも枠が消えないよう、いちばん最後に強く書く（2026-11-04 CodeRabbit） */
+:is(.icon,button,a):focus-visible{outline:2px solid var(--route)!important;outline-offset:2px}
 </style>
 </head>
 <body>

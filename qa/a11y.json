@@ -1,0 +1,10 @@
+{
+  "screens": [
+    { "name": "今日の5問", "click": ["#go-d"] },
+    { "name": "答えたあと", "click": ["#go-d", "#ch button"] },
+    { "name": "結果", "click": ["#go-d", "#ch button", "#next", "#ch button", "#next", "#ch button", "#next", "#ch button", "#next", "#ch button", "#next"] },
+    { "name": "とことん", "click": ["#go-e", "#ch button"] },
+    { "name": "カレンダー", "click": ["#go-cal"] },
+    { "name": "実績", "click": ["#go-ach"] }
+  ]
+}

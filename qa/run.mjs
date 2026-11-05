@@ -52,7 +52,7 @@ check("README の URL のすぐ後ろに全角の字を続けない（Link check
 const ext = [...html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]).filter((u) => !/^https:\/\/fonts\.googleapis\.com(\/|$)|^https:\/\/ko-fi\.com\/satouaaaaa$/.test(u));
 check("外から読むのは文字（Google Fonts）だけ。スクリプト・広告・解析を入れない", ext.length === 0, ext.join(","));
 check("CSP で通信先を自分だけにしている", /connect-src 'self'/.test(html) && !/connect-src[^;"]*https/.test(html));
-check("Math.random は練習の問題の種だけ（今日の5問・上級は日付の種）", (html.match(/Math\.random/g) || []).length === 1 && !/Math\.random/.test(readFileSync(path.join(root, "gen.js"), "utf8")));
+check("Math.random は練習・とことんの問題の種だけ（今日の5問・上級は日付の種）", (html.match(/Math\.random/g) || []).length === 4 && !/Math\.random/.test(readFileSync(path.join(root, "gen.js"), "utf8")));
 check("画面にお笑いの言葉を入れない（本物っぽく）", !/お笑い|ギャグ|ボケ|ツッコミ|なんでやねん|（うそ）/.test(html));
 { const og = (k) => (html.match(new RegExp(`<meta (?:property|name)="${k}" content="([^"]+)"`)) || [])[1] || "";
   const png = readFileSync(path.join(root, "og.png"));
@@ -198,6 +198,50 @@ try {
     check("実績の画面：まだの実績は条件と進み具合（12/30）を出す", (await pa.locator(".ach").count()) === r.n && (await pa.textContent(".ach[data-id=wind30]")).includes("12/30") && (await pa.locator(".ach[data-id=wind30] .bar").count()) === 1);
     await pa.close(); }
 
+  { // とことん：次々に出る・やさしい→ふつう→むずかしい・まちがいで🎫を使う・🎫0でまちがえたら終わり・降りると自己ベスト（2026-11-05 satou さん「一日で遊べる量が少なすぎる」）
+    const pe = await newPage(); await pe.click("#howto-ok");
+    const ramp = await pe.evaluate(() => { const g = window.__tk, bad = []; let made = 0; for (let n = 0; n < 300; n++) { const L = g.endlessList(); if (L.length !== 100 || new Set(L.map((x) => x.seed)).size !== 100) { bad.push(n + " 数・重なり"); continue; } L.forEach((x, i) => { const lv = i < 5 ? 0 : i < 20 ? 1 : 2, ts = g.ERAMP[lv][0]; if (x.lv !== lv || x.h !== g.ERAMP[lv][1] || !ts.includes(x.t)) bad.push(`${n}:${i}`); }); if (n < 20) for (const x of L) { if (!g.qOf(x)) bad.push(`${n} 作れない`); made++; } } return { bad, made }; });
+    check("とことんの並び（300回）：やさしい5→ふつう15→むずかしい80（8方位）、同じ種は出ず、どれも問題になる", ramp.bad.length === 0 && ramp.made === 2000, ramp.bad.slice(0, 3).join(","));
+    check("ホームに「とことん」の大きなボタン", (await pe.locator("#go-e.main").count()) === 1);
+    await pe.click("#go-e");
+    for (let j = 0; j < 3; j++) { await ansNow(pe); await pe.click("#next"); }
+    check("とことんは何問目かを出し、🎫が3枚・降りるボタンがある", (await pe.textContent("header")).includes("4問目") && (await pe.evaluate(() => window.__tk.load().runs.e.life)) === 3 && (await pe.textContent("#quit")).includes("3問で終える"));
+    await ansNow(pe, false);
+    check("とことんはまちがえると🎫を1枚使う", (await pe.evaluate(() => window.__tk.load().runs.e.life)) === 2 && (await pe.textContent("#etk")).includes("のこり2枚") && (await pe.textContent("#life")).split("🎫").length - 1 === 3);
+    await pe.click("#next"); await pe.click("#back");
+    check("ホームのボタンは「とことんの続きから」", (await pe.textContent("#go-e")).includes("続きから（5問目）"));
+    await pe.click("#go-e");
+    check("とことんは途中で閉じても続きから（5問目・🎫2のまま）", (await pe.textContent("header")).includes("5問目") && (await pe.evaluate(() => window.__tk.load().runs.e.life)) === 2);
+    await pe.click("#quit");
+    check("降りると正解の数と自己ベスト更新が出て、記録に残る（今日の記録・連続には入らない・シェアは出さない）", (await pe.textContent("#eres")).includes("3問") && (await pe.textContent("#ebest")).includes("自己ベスト更新") && (await pe.locator("#share").count()) === 0 && (await pe.evaluate(() => { const s = window.__tk.load(); return s.ebest === 3 && !s.runs.e && Object.keys(s.days).length === 0 && s.ok === 3; })));
+    await pe.click("#go-e"); await pe.click("#quit");
+    check("ベストに届かないと、ベストと「あと何問で更新」を出し、ベストは下げない", (await pe.textContent("#ebest")).includes("あと4問で更新") && (await pe.evaluate(() => window.__tk.load().ebest)) === 3);
+    await pe.click("#go-e"); await ansNow(pe); await pe.click("#next");
+    await pe.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); s.runs.e.life = 0; localStorage.setItem(k, JSON.stringify(s)); }, KEY); await pe.click("#back"); await pe.click("#go-e");
+    await ansNow(pe, false);
+    check("🎫が無いときにまちがえると、とことんは終わる", (await pe.textContent("#etk")).includes("ここまで") && (await pe.textContent("#next")).includes("結果を見る") && (await pe.evaluate(() => window.__tk.load().runs.e.over)) === true);
+    await pe.click("#next");
+    check("終わりの画面に正解の数と「もう一度とことん」", (await pe.textContent("#eres")).includes("1問") && (await pe.locator("#go-e.main").count()) === 1 && (await pe.evaluate(() => { const s = window.__tk.load(); return !s.runs.e && s.ebest === 3; })));
+    await pe.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); s.runs.e = { mode: "e", date: "2000-01-01", list: window.__tk.endlessList(), res: [1, 1, 0], life: 0, over: true, id: "x" }; localStorage.setItem(k, JSON.stringify(s)); }, KEY);
+    await pe.reload();
+    check("🎫が尽きて終わった回は、開き直すと終わりの画面へ進み、ベストを下げない", (await pe.textContent("#eres")).includes("2問") && (await pe.evaluate(() => { const s = window.__tk.load(); return !s.runs.e && s.ebest === 3; })));
+    check("保存に失敗したあとの統合でも、自己ベストは大きいほうを残す", await pe.evaluate((K) => { const g = window.__tk, s0 = g.load(); mem = JSON.stringify(Object.assign({}, s0, { t: 9, ebest: 2 })); localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: 5, ebest: 7 }))); const r = g.load().ebest; mem = null; return r === 7; }, KEY));
+    await pe.close(); }
+  { // 今日の5問の結果に「続けて遊ぶ：とことん」
+    const pr = await newPage(); await pr.click("#howto-ok"); await pr.click("#go-d");
+    for (let j = 0; j < 5; j++) { await ansNow(pr); await pr.click("#next"); }
+    check("今日の5問の結果に「続けて遊ぶ：とことん」の大きなボタン", (await pr.locator("#go-e.main").count()) === 1 && (await pr.textContent("#go-e")).includes("とことん"));
+    await pr.click("#go-e");
+    check("結果の画面からとことんを始められる", (await pr.evaluate(() => window.__tk.mode())) === "e" && (await pr.textContent("header")).includes("1問目"));
+    await pr.close(); }
+  for (const w of [320, 390]) { // とことんの遊ぶ画面・終わりの画面もスマホ幅で崩れない
+    const pv = await newPage(w, 700); await pv.click("#howto-ok");
+    const look = () => pv.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), hd: document.querySelector("header") ? document.querySelector("header").getBoundingClientRect().height : 0 }));
+    const h0 = await look(); await pv.click("#go-e"); const a = await look(); await ansNow(pv, false); const b = await look();
+    await pv.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); s.runs.e.list = s.runs.e.list.map((x) => ({ ...x, t: "wind", h: 1, lv: 2 })); localStorage.setItem(k, JSON.stringify(s)); }, KEY); await pv.click("#next"); const c = await look();
+    await pv.click("#quit"); const d = await look();
+    check(`幅${w}px：ホーム・とことんの遊ぶ画面（8方位も）・終わりの画面は横にはみ出さず、押せる所は高さ44px以上`, [h0, a, b, c, d].every((x) => !x.over && x.small.length === 0) && c.hd < 70, [h0, a, b, c, d].flatMap((x) => x.small).join(",") + ` 見出し${c.hd}px`);
+    await pv.close(); }
   // 8. カレンダーと、取りこぼした日をあとから遊ぶ（日付を5日先にして確かめる）
   { const OFF = Number(process.env.QA_DAY_OFFSET || 5); // 月をまたぐ日は QA_DAY_OFFSET=28 で確かめる
     const pl = await browser.newPage({ viewport: { width: 390, height: 844 } });

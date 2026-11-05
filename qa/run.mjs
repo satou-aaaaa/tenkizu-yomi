@@ -137,6 +137,7 @@ try {
   check("X・LINE は押したときに開くリンクだけ", /^https:\/\/twitter\.com\/intent\/tweet\?text=/.test(await page.getAttribute("#toX", "href")) && /^https:\/\/line\.me\/R\/share\?text=/.test(await page.getAttribute("#toLine", "href")));
   check("結果に5問の答えが出る", (await page.locator(".res div").count()) === 5);
   check("今日の5問を初めて終えると、結果に「🏅 実績：はじめの1枚」が小さく出る", ((await page.locator("#achnew").textContent().catch(() => "")) || "").includes("🏅 実績：はじめの1枚"));
+  check("結果に「あと少しの実績」を1つだけ出す：まだの実績のうち目標にいちばん近いもの（取った・0のものは選ばない。研究の要点 12）", await page.evaluate(() => { const g = window.__tk, s = g.load(), t = g.tally(s), nx = g.nextAch(s), el = document.querySelectorAll("#achnext"); if (!nx) return el.length === 0; const cand = g.ACH.filter((a) => t[a[4]] > 0 && t[a[4]] < a[5]); return el.length === 1 && el[0].textContent.includes(nx.name) && el[0].textContent.includes("あと" + nx.left) && cand.every((a) => t[a[4]] / a[5] <= nx.r + 1e-12) && !g.achGot(s).includes(nx.id); }) && await page.evaluate(() => window.__tk.nextAch(window.__tk.load()) !== null));
   check("全問正解でない日は Ko-fi のひとことを出さない", (await page.locator(".kofi").count()) === 0);
   await page.click("#back");
   check("ホームで連続1日・今日の結果を見るに変わる・正解4", (await page.textContent(".stats")).includes("1連続の日") && (await page.textContent(".stats")).includes("4正解") && (await page.textContent("#go-d")).includes("結果"));

@@ -117,8 +117,14 @@ try {
   await ansNow(page, false);
   check("答えたあと、天気図に風の矢印を重ねる（流れが見える）", (await page.locator("#wl path").count()) >= 1 && (await page.getAttribute("#wl path", "d")).split("M").length > 20 && await page.locator("#wleg").isVisible());
   check("まちがえると答えに色が付き、説明が出る", (await page.locator("#ch button.ng").count()) === 1 && (await page.locator("#ch button.ok").count()) === 1 && (await page.locator(".why").count()) === 1);
+  check("正解・まちがいは色だけでなく ✓・✕ と読み上げの名前（正解・まちがい）でも分かる（WCAG 1.4.1）", await page.evaluate(() => { const ok = document.querySelector("#ch button.ok"), ng = document.querySelector("#ch button.ng"); return !!ok && !!ng && ok.querySelector(".mk").textContent === "✓" && ng.querySelector(".mk").textContent === "✕" && /（正解）/.test(ok.getAttribute("aria-label")) && /まちがい・えらんだ答え/.test(ng.getAttribute("aria-label")) && getComputedStyle(ng).borderStyle === "dashed"; }));
+  check("天気図に読み上げの名前（高気圧・低気圧の数）があり、問題文と答え合わせが読み上げの対象", await page.evaluate(() => /^天気図：高気圧\d+つ・低気圧\d+つ/.test(document.querySelector("#mp svg").getAttribute("aria-label")) && !!document.querySelector(".q[data-a11y-say]") && !!document.querySelector(".verdict[role=status]")));
   await page.click("#next");
   c = await curK(page);
+  check("進み具合の点は、まちがえた問題を中が空の枠（形）で出し、名前に正解・まちがいの数", await page.evaluate(() => { const d = document.querySelector(".dots"), i = [...d.querySelectorAll("i")]; return i[0].classList.contains("miss") && getComputedStyle(i[0]).backgroundColor === "rgba(0, 0, 0, 0)" && i[1].classList.contains("on") && /まちがい1/.test(d.getAttribute("aria-label")); }));
+  await page.evaluate(() => document.documentElement.classList.add("a11y-cvd"));
+  check("色の見分けを助ける設定では、前線・高低の色をカラーユニバーサルデザインの組（青 #0072B2・朱 #D55E00）に替える", await page.evaluate(() => { const want = { cH: "rgb(0, 114, 178)", cL: "rgb(213, 94, 0)", fc: "rgb(0, 114, 178)", fw: "rgb(213, 94, 0)" }, els = [...document.querySelectorAll("#mp .cH, #mp .cL, #mp .fc, #mp .fw")]; return els.length > 0 && els.every((e) => getComputedStyle(e).fill === want[e.getAttribute("class")]); }));
+  await page.evaluate(() => document.documentElement.classList.remove("a11y-cvd"));
   check("2問目は風の強さ：2つの地点が地図に出る", c.q.t === "strong" && (await page.locator("#mp svg circle").count()) === 2 && (await page.locator("#ch button").count()) === 2);
   await page.reload(); await page.click("#go-d");
   check("途中で閉じても、答えた問題の次から（続きから）", (await curK(page)).i === 1 && (await page.evaluate(() => window.__tk.load().runs.d.res.length)) === 1);
@@ -262,6 +268,7 @@ try {
     // その日の月まで戻って読み、今の月に戻す（月をまたぐ日でも同じに読む）
     const cell = async (k) => { let back = 0; while (back < 2 && !(await pl.locator(`.cal [data-k="${k}"]`).count())) { await pl.click("#prev"); back++; } const v = await pl.evaluate((k) => { const e = document.querySelector(`.cal [data-k="${k}"]`); return e ? e.className + "|" + e.textContent : ""; }, k); for (; back > 0; back--) await pl.click("#next"); return v; };
     check("カレンダー：全問正解の日は濃い色に★3と上級の印・3問の日は★2・あとからの日は ↺", (await cell(dk(1))).includes("p3") && (await cell(dk(1))).includes("★★★") && (await cell(dk(1))).includes("上") && (await cell(dk(2))).includes("p2") && (await cell(dk(3))).includes("late") && (await cell(dk(3))).includes("↺"));
+    check("カレンダーの色の見本にも★の数を書く（色だけで分けない）", /★★★ 全問正解/.test(await pl.textContent(".calleg")) && /★★ 3〜4問/.test(await pl.textContent(".calleg")));
     check("カレンダー：連続の日は1以上のときだけ小さく出し、休んだ日を責める言葉は無い", (await pl.textContent("header")).includes("連続 2日") && !/さぼ|休んだ|途切れ|残念/.test(await pl.textContent("#app")));
     check("カレンダー：前の月へ戻るボタン（始めた月より前には行かない）", (await pl.locator("#prev").count()) === 1 && (today.slice(0, 7) > "2026-11" ? !(await pl.locator("#prev").isDisabled()) : await pl.locator("#prev").isDisabled()));
     if (want.length >= 2) {
@@ -397,9 +404,21 @@ try {
   try { // 引き継ぎコード（別の端末へ記録を移す。shared-workflows template/qa/transfer-check.mjs）
     await checkTransfer({ browser, url, game: "tenkizu-yomi", sample: { "tenkizu-v1": JSON.stringify({ v: 1, tut: true }) }, check, open: async (p) => { await p.click("#howto-ok", { timeout: 1500 }).catch(() => {}); } });
   } catch (e) { check("引き継ぎコード", false, e.message.split("\n")[0]); }
+  try { // 動きを減らす設定では振動しない（WCAG 2.3.3・game-dev.md A8）
+    const cc = await browser.newContext(); await cc.addInitScript(() => { localStorage.setItem("a11y-v1", JSON.stringify({ calm: true })); window.__vib = 0; Object.defineProperty(navigator, "vibrate", { value: () => { window.__vib++; return true; }, configurable: true }); });
+    const pc = await cc.newPage(); await pc.goto(url); await pc.click("#howto-ok"); await pc.click("#go-p"); await pc.locator(".lv button").first().click(); await pc.locator("#ch button").first().click();
+    check("動きを減らす設定では、答えたときに振動しない", (await pc.evaluate(() => window.__vib)) === 0 && (await pc.locator(".verdict").count()) === 1);
+    await cc.close();
+  } catch (e) { check("動きを減らす設定では、答えたときに振動しない", false, e.message.split("\n")[0]); }
   await browser.close();
 }
 check("画面のエラーが無い", errors.length === 0, errors.slice(0, 3).join(" | "));
+
+{ // 見やすさ・読みやすさ・偏り（shared-workflows template/qa/a11y.mjs の写し。routines/game-dev.md「だれでも遊べるように」）
+  const { spawnSync } = await import("node:child_process");
+  const a = spawnSync(process.execPath, [path.join(root, "qa", "a11y.mjs")], { encoding: "utf8", env: process.env });
+  check("見やすさ・読みやすさの検査（qa/a11y.mjs。中身は qa-report/a11y.md）", a.status === 0, (a.stdout.match(/^- ❌.*$/gm) || []).join(" / ") || (a.status ? a.stderr.slice(-300) : ""));
+}
 
 const ng = results.filter((r) => !r.ok);
 const md = `# 天気図よみ QA\n\n${results.map((r) => `- ${r.ok ? "✅" : "❌"} ${r.name}${r.detail ? `（${r.detail}）` : ""}`).join("\n")}\n\n${ng.length ? `❌ ${ng.length}件` : `✅ ${results.length}項目すべて通過`}\n`;

@@ -27,8 +27,8 @@
 <style>
 /* 紙の地図：海は淡い青、陸は生成り、通った道は朱色の線 */
 :root{
-  --bg:#e3ecf3; --paper:#fffdf7; --ink:#26323a; --ink2:#5f6f78; --line:#26323a22;
-  --land:#f6f0e1; --edge:#8a8170; --sea:#cfe1ea; --route:#d2492f; --route2:#9b3220; --go:#2f8a5b; --goal:#d2492f; --nb:#ffe7a3; --gold:#d79b2c;
+  --bg:#e3ecf3; --paper:#fffdf7; --ink:#26323a; --ink2:#53626b; --line:#26323a22;
+  --land:#f6f0e1; --edge:#8a8170; --sea:#cfe1ea; --route:#c43f26; --route2:#9b3220; --go:#2f8a5b; --goal:#d2492f; --nb:#ffe7a3; --gold:#d79b2c;
   --f-body:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Yu Gothic",sans-serif;
   color-scheme:light;
 }
@@ -41,7 +41,9 @@ h1 small{font-size:12px;letter-spacing:0;color:var(--ink2);margin-left:8px;font-
 .icon{all:unset;cursor:pointer;font-size:18px;min-width:44px;height:44px;display:grid;place-items:center;border-radius:12px;border:1px solid var(--line);box-sizing:border-box;padding:0 8px;background:var(--paper)}
 .dots{display:flex;gap:6px;flex:1;max-width:120px}
 .dots i{flex:1;height:6px;border-radius:3px;background:var(--line)}
-.dots i.on{background:var(--route)}.dots i.done{background:var(--ink)}
+.dots{align-items:center}.dots i.on{background:var(--route);height:10px;border-radius:4px}.dots i.done{background:var(--ink)}
+/* まちがえた問題は中が空の枠（色だけで分けない。WCAG 1.4.1） */
+.dots i.miss{background:transparent;box-shadow:inset 0 0 0 2px var(--route);height:8px}
 button.main,a.main{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;border-radius:16px;background:var(--route);color:#fff;font-weight:800;font-size:17px;padding:0 16px;text-align:center;box-shadow:0 4px 0 var(--route2)}
 button.main:active{transform:translateY(2px);box-shadow:0 2px 0 var(--route2)}
 button.main.alt{background:#2f5d7a;box-shadow:0 4px 0 #1d3d52}
@@ -61,6 +63,11 @@ button.sub:disabled{opacity:.4;cursor:default}
 .ch button.ok{background:#d8f0e0;border-color:var(--go)}
 .ch button.ng{background:#fadcd5;border-color:var(--route)}
 .ch button:disabled{cursor:default}
+/* 答え合わせの印：正解 ✓・選んだまちがい ✕（色だけで分けない） */
+.ch button{position:relative}
+.ch button .mk{position:absolute;top:3px;right:6px;font-size:16px;line-height:1;font-weight:800}
+.ch button.ok .mk{color:#1f6b45}.ch button.ng .mk{color:var(--route2)}
+.ch button.ng{border-style:dashed}
 .why{background:var(--paper);border-left:4px solid #2f5d7a;border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.7;margin:0}
 .legend{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;font-size:11px;color:var(--ink2)}
 .status{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--ink2);min-height:22px}
@@ -105,7 +112,7 @@ footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:cente
 @keyframes draw{from{stroke-dashoffset:240}to{stroke-dashoffset:0}}
 .ch button.ok{animation:pop .35s ease-out}
 @keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.06)}100%{transform:scale(1)}}
-.legend .wleg{color:#d2492f;font-weight:800}
+.legend .wleg{color:#b5361f;font-weight:800}
 /* 実績・カレンダー */
 .badge{background:var(--route);color:#fff;border-radius:9px;padding:1px 6px;font-size:12px}
 .life{font-size:18px;letter-spacing:2px;white-space:nowrap}.life .off{opacity:.25}
@@ -137,12 +144,165 @@ footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:cente
 .calleg span{display:inline-flex;align-items:center;gap:4px}.calleg em{display:inline-block;width:14px;height:14px;border-radius:4px;font-style:normal}
 @media (max-width:360px){.row>.sub{font-size:14px;padding:0 8px}}
 [hidden]{display:none!important}
+/* 色の見分けを助ける（html.a11y-cvd）：正解は青・まちがいは橙に替え、前線・高低もカラーユニバーサルデザインの組に */
+html.a11y-cvd .ch button.ok{background:#d6e8f5;border-color:#0072B2;border-width:3px}
+html.a11y-cvd .ch button.ng{background:#fbe6c6;border-color:#D55E00}
+html.a11y-cvd .ch button.ok .mk{color:#00507e}html.a11y-cvd .ch button.ng .mk{color:#9a3d00}
+html.a11y-cvd .ch button .mk{font-size:17px}
+html.a11y-cvd .dots i.done{background:#0072B2}html.a11y-cvd .dots i.miss{box-shadow:inset 0 0 0 2px #D55E00}
+html.a11y-cvd .fc{fill:#0072B2}html.a11y-cvd .fw{fill:#D55E00}html.a11y-cvd .fl-cold{stroke:#0072B2}html.a11y-cvd .fl-warm{stroke:#D55E00}html.a11y-cvd .fl-stay{stroke:#7a4f9e}
+html.a11y-cvd .cH{fill:#0072B2}html.a11y-cvd .cL{fill:#D55E00}
+html.a11y-cvd .wb{stroke:#D55E00}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* all:unset のボタン（カレンダーのます目など）でも枠が消えないよう、いちばん最後に強く書く（2026-11-04 CodeRabbit） */
 :is(.icon,button,a):focus-visible{outline:2px solid var(--route)!important;outline-offset:2px}
 </style>
 <!-- 引き継ぎコード（shared-workflows template/transfer.js の写し）。ゲームの script より前に置く -->
 <script src="transfer.js" data-game="tenkizu-yomi" data-keys="tenkizu-v1"></script>
+<!-- a11y:begin 見やすさの設定 v4（shared-workflows template/a11y/a11y.html の写し。ここでは直さず、ひな形を直して全部のゲームへ写す。drift-check と qa/a11y.mjs が同じ中身か見る） -->
+<style id="a11y-css">
+/* だれでも：キーボードで選んだ所に太い枠（WCAG 2.4.7・2.4.13） */
+:is(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline:3px solid #1a5fd0!important;outline-offset:2px!important;box-shadow:0 0 0 5px #fff!important}
+/* 読みやすい文字：UD フォント・行間 1.7・字間を少し広げる・斜体にしない（BDA Dyslexia Style Guide） */
+html.a11y-read body{line-height:1.7}
+html.a11y-read body,html.a11y-read body :where(*:not(svg):not(svg *):not([data-a11y-keepfont]):not([data-a11y-keepfont] *)){font-family:"BIZ UDPGothic","BIZ UDGothic","UD デジタル 教科書体 NK-R","UD Digi Kyokasho NK-R","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif!important;font-style:normal!important}
+html.a11y-read :is(p,li,dd,dt,blockquote,[data-a11y-say]){line-height:1.8!important;letter-spacing:.04em!important}
+html.a11y-read em,html.a11y-read i:not([aria-hidden]){font-style:normal!important;font-weight:700}
+/* 動きを減らす：揺れ・点滅・すべる動きを止める（WCAG 2.3.3。端末の「視差効果を減らす」でも自動で入る） */
+html.a11y-calm *,html.a11y-calm *::before,html.a11y-calm *::after{animation-duration:.001ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:.001ms!important;transition-delay:0s!important;scroll-behavior:auto!important}
+/* 色の見分けを助ける：ゲームごとの形・模様は各ゲームが html.a11y-cvd の下に書く。ここではリンクに下線 */
+html.a11y-cvd a{text-decoration:underline!important}
+/* ふりがな：ゲームが <ruby class="a11y-rb"> を置いた所だけ。選んだときだけ出す */
+html:not(.a11y-ruby) ruby.a11y-rb>rt{display:none}
+/* 設定の画面（どのゲームでも同じ見た目・同じ濃さ。白地に黒で 15:1） */
+.a11y-dlg{max-width:min(420px,calc(100vw - 32px));width:100%;box-sizing:border-box;border:2px solid #1d2320;border-radius:14px;padding:18px 16px 14px;background:#fffdf8;color:#1d2320;font:500 16px/1.6 "BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;letter-spacing:0}
+.a11y-dlg::backdrop{background:#0008}
+.a11y-dlg h2{font-size:19px;margin:0 0 4px;font-weight:700;line-height:1.4}
+.a11y-dlg p{margin:4px 0 10px;font-size:14px;color:#3d4440;line-height:1.6}
+.a11y-dlg label{display:flex;gap:12px;align-items:center;min-height:48px;padding:6px 4px;border-top:1px solid #1d232022;cursor:pointer;line-height:1.4}
+.a11y-dlg label small{display:block;font-size:13px;color:#3d4440}
+.a11y-dlg input[type=checkbox]{width:26px;height:26px;flex:none;accent-color:#1a5fd0;margin:0}
+.a11y-dlg .a11y-row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.a11y-dlg button,.a11y-btn,.a11y-saybtn{min-height:44px;min-width:44px;border-radius:10px;border:2px solid #1d2320;background:#fff;color:#1d2320;font:700 15px/1.2 "BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;padding:0 14px;cursor:pointer;letter-spacing:0}
+.a11y-dlg button.a11y-ok{background:#1d2320;color:#fff}
+.a11y-btn.a11y-float{position:fixed;left:max(8px,env(safe-area-inset-left,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:2147483000}
+/* 読み上げボタンが、いちばん下のボタン・リンクにかぶらないよう下をあける */
+html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!important}
+.a11y-saybtn{position:fixed;right:max(8px,env(safe-area-inset-right,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:2147483000;box-shadow:0 2px 8px #0003}
+.a11y-saybtn[hidden],.a11y-dlg [hidden]{display:none!important}
+.a11y-note{font-size:13px!important}
+</style>
+<script id="a11y-script">
+/* 見やすさの設定（色覚・ディスレクシア・弱視・動きに弱い人のため）。外へは何も送らない。
+   設定は localStorage の a11y-v1 に置く。同じサイト（satou-aaaaa.github.io）のゲームは同じ設定を使う。
+   ゲームの側でできること：
+   - 設定を開くボタンに data-a11y-open を付ける（無ければ左下に「Aa」のボタンを出す）
+   - 読み上げる文に data-a11y-say を付ける（問題文・知らせなど）
+   - 色の見分けを助ける形・模様は html.a11y-cvd の下に CSS で書く。JS では A11y.on('cvd')
+   - 揺れ・すべる動きを JS で動かすときは、A11y.on('calm') なら止める
+   - 設定が変わると document に a11ychange が届く
+   - 設定の印は html の class「a11y-<設定の名前>」（a11y-read など）。部品の class はこれと重ならない名前にする（2026-11-05 a11y-say がボタンとぶつかった） */
+(() => {
+  const KEY = "a11y-v1";
+  const root = document.documentElement;
+  const OPTS = [
+    ["read", "読みやすい文字", "UD フォント・行間と字間を広く"],
+    ["cvd", "色の見分けを助ける", "色に形・模様・記号を足す"],
+    ["calm", "動きを減らす", "揺れ・点滅・すべる動きを止める"],
+    ["say", "読み上げのボタンを出す", "問題や知らせを声で読む（端末の中の声だけ）"],
+    ["ruby", "ふりがなを出す", "むずかしい漢字に読みを付ける"],
+  ];
+  const media = (q) => { try { return matchMedia(q).matches; } catch { return false; } };
+  let S = {};
+  try { S = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { S = {}; }
+  // 決めていないものは端末の設定に合わせる（視差効果を減らす → 動きを減らす）
+  const on = (k) => (k in S ? !!S[k] : k === "calm" ? media("(prefers-reduced-motion: reduce)") : false);
+  let fontLoaded = false;
+  const loadFont = () => {
+    if (fontLoaded) return; fontLoaded = true;
+    // Google Fonts を許しているページだけ取りに行く（許していなければ端末にある UD フォントを使う）
+    const csp = (document.querySelector('meta[http-equiv="Content-Security-Policy"]') || {}).content || "";
+    if (csp && !/fonts\.googleapis\.com/.test(csp)) return;
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = "https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap";
+    document.head.appendChild(l);
+  };
+  const apply = () => {
+    for (const [k] of OPTS) root.classList.toggle("a11y-" + k, on(k));
+    if (on("read")) loadFont();
+    if (sayBtn) sayBtn.hidden = !on("say");
+    if (!on("say")) stop();
+  };
+  const set = (k, v) => {
+    S[k] = !!v;
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch { /* 保存できなくても今の画面には効かせる */ }
+    apply();
+    document.dispatchEvent(new CustomEvent("a11ychange", { detail: { key: k, on: !!v } }));
+  };
+
+  // 読み上げ：端末の中の日本語の声だけを使う（外へ文字を送る声は使わない）
+  const voice = () => { try { return speechSynthesis.getVoices().find((v) => /^ja/i.test(v.lang) && v.localService) || null; } catch { return null; } };
+  const stop = () => { try { speechSynthesis.cancel(); } catch { /* 無い端末 */ } };
+  const visible = (el) => { const r = el.getBoundingClientRect(); const cs = getComputedStyle(el); return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !el.closest("[hidden],[aria-hidden=true],[inert]"); };
+  const textOf = (sel) => [...document.querySelectorAll(sel)].filter(visible).map((el) => (el.getAttribute("aria-label") || el.innerText || "").trim()).filter(Boolean).join("。");
+  // data-a11y-say が無い画面では、見出しと知らせの場所を読む（2026-11-05 何も読まれず設定が開くだけだった）
+  const sayText = () => textOf("[data-a11y-say]") || textOf("h1,h2,[role=status],[aria-live]");
+  const say = (text) => {
+    const v = voice();
+    if (!v || !text) return false;
+    stop();
+    const u = new SpeechSynthesisUtterance(text.slice(0, 600));
+    u.voice = v; u.lang = v.lang; u.rate = 0.95;
+    speechSynthesis.speak(u);
+    return true;
+  };
+
+  let dlg = null, sayBtn = null, lastFocus = null;
+  const build = () => {
+    dlg = document.createElement("dialog");
+    dlg.className = "a11y-dlg";
+    dlg.setAttribute("aria-labelledby", "a11y-h");
+    const hasRuby = !!document.querySelector("ruby.a11y-rb");
+    dlg.innerHTML = `<h2 id="a11y-h">見やすさ・読みやすさ</h2><p>ほかのゲームにも同じ設定が使われます。文字は2本の指で広げると大きくなります。</p>` +
+      OPTS.filter(([k]) => k !== "ruby" || hasRuby).map(([k, n, d]) => `<label><input type="checkbox" data-k="${k}"><span>${n}<small>${d}</small></span></label>`).join("") +
+      `<p class="a11y-note" id="a11y-novoice" hidden>この端末には、外へ送らずに読める日本語の声がありません。</p><div class="a11y-row"><button type="button" class="a11y-ok" data-a11y-close>閉じる</button></div>`;
+    document.body.appendChild(dlg);
+    dlg.addEventListener("change", (e) => {
+      const k = e.target.dataset && e.target.dataset.k;
+      if (!k) return;
+      set(k, e.target.checked);
+      if (k === "say") dlg.querySelector("#a11y-novoice").hidden = !(e.target.checked && !voice());
+    });
+    dlg.querySelector("[data-a11y-close]").addEventListener("click", () => dlg.close());
+    dlg.addEventListener("close", () => { if (lastFocus && lastFocus.focus) lastFocus.focus(); });
+    sayBtn = document.createElement("button");
+    sayBtn.type = "button"; sayBtn.className = "a11y-saybtn"; sayBtn.textContent = "🔊 読む"; sayBtn.setAttribute("aria-label", "画面の問題を読み上げる");
+    sayBtn.addEventListener("click", () => {
+      try { if (speechSynthesis.speaking) return stop(); } catch { /* 無い端末 */ }
+      if (!say(sayText())) open();
+    });
+    document.body.appendChild(sayBtn);
+    if (!document.querySelector("[data-a11y-open]")) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "a11y-btn a11y-float"; b.textContent = "Aa"; b.setAttribute("data-a11y-open", ""); b.setAttribute("aria-label", "見やすさの設定");
+      document.body.appendChild(b);
+    }
+    document.addEventListener("click", (e) => { const t = e.target.closest && e.target.closest("[data-a11y-open]"); if (t) { e.preventDefault(); open(); } });
+    apply();
+  };
+  const open = () => {
+    if (!dlg) build();
+    lastFocus = document.activeElement;
+    for (const c of dlg.querySelectorAll("input[data-k]")) c.checked = on(c.dataset.k);
+    dlg.querySelector("#a11y-novoice").hidden = !(on("say") && !voice());
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+  };
+  apply();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
+  window.A11y = { on, set, open, say, stop };
+})();
+</script>
+<!-- a11y:end -->
 </head>
 <body>
 <div class="wrap" id="app"></div>
@@ -155,7 +315,7 @@ footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:cente
   </ol>
   <p>前線：赤い半円は温暖前線、青い三角は寒冷前線、赤と青が交互なのは停滞前線。天気図は練習用に作った架空のものです（本物の予報ではありません）。</p>
   <p>今日の5問はだれでも同じで1日1回。時間制限はありません。</p>
-  <p><a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
+  <p><a href="#" data-a11y-open>見やすさの設定（文字・色・動き・読み上げ）</a>　<a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
   <button class="main" id="howto-ok" style="width:100%">わかった</button>
 </dialog>
 <script src="japan.js"></script>
@@ -244,10 +404,11 @@ function nextAch(s) {
 
 // ---- 画面 ----
 const md = (k) => `${+k.slice(5, 7)}/${+k.slice(8, 10)}`;
-function toast(t) { const d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 1800); }
-const buzz = (n = 12) => { try { navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
+function toast(t) { const d = document.createElement("div"); d.className = "toast"; d.setAttribute("role", "status"); d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), 1800); }
+const calm = () => !!(window.A11y && A11y.on("calm"));
+const buzz = (n = 12) => { if (calm()) return; try { navigator.vibrate && navigator.vibrate(n); } catch (e) {} };
 const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
-const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="#" data-hk>引き継ぎ</a><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a><a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi で応援</a></footer>`;
+const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="#" data-a11y-open>見やすさ</a><a href="#" data-hk>引き継ぎ</a><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a><a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi で応援</a></footer>`;
 function bindFooter() { const h = $("f-how"); if (h) h.onclick = (e) => { e.preventDefault(); openHow(); }; }
 function openHow() { $("fb2").href = FEEDBACK; const d = $("howto"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); }
 $("howto-ok").onclick = () => { const d = $("howto"); d.close ? d.close() : d.removeAttribute("open"); save((s) => { s.tut = true; }); };
@@ -272,26 +433,29 @@ function isobars(m) {
 }
 function frontSvg(f) {
   const col = { cold: "#2f6fd0", warm: "#d2492f", stay: "#d2492f" }[f.k];
-  let s = `<polyline points="${f.pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${f.k === "stay" ? "#7a5aa8" : col}" stroke-width="3.5" stroke-linejoin="round"/>`;
+  let s = `<polyline points="${f.pts.map((p) => p.join(",")).join(" ")}" class="fl-${f.k}" fill="none" stroke="${f.k === "stay" ? "#7a5aa8" : col}" stroke-width="3.5" stroke-linejoin="round"/>`;
   let n = 0;
   for (let i = 1; i < f.pts.length; i++) {
     const [ax, ay] = f.pts[i - 1], [bx, by] = f.pts[i], L = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / L, uy = (by - ay) / L, nx = uy, ny = -ux;
     for (let t = 14; t < L - 6; t += 30, n++) {
       const x = ax + ux * t, y = ay + uy * t, tri = f.k === "cold" || (f.k === "stay" && n % 2 === 0), side = f.k === "stay" && !tri ? -1 : 1;
-      if (tri) s += `<path d="M${x - ux * 7},${y - uy * 7}L${x + nx * 11 * side},${y + ny * 11 * side}L${x + ux * 7},${y + uy * 7}Z" fill="#2f6fd0"/>`;
-      else { const a = Math.atan2(uy, ux) * 180 / Math.PI; s += `<path d="M${x - ux * 7},${y - uy * 7}A7,7 0 0 ${side > 0 ? 1 : 0} ${x + ux * 7},${y + uy * 7}Z" fill="#d2492f"/>`; }
+      if (tri) s += `<path d="M${x - ux * 7},${y - uy * 7}L${x + nx * 11 * side},${y + ny * 11 * side}L${x + ux * 7},${y + uy * 7}Z" class="fc" fill="#2f6fd0"/>`;
+      else { const a = Math.atan2(uy, ux) * 180 / Math.PI; s += `<path d="M${x - ux * 7},${y - uy * 7}A7,7 0 0 ${side > 0 ? 1 : 0} ${x + ux * 7},${y + uy * 7}Z" class="fw" fill="#d2492f"/>`; }
     }
   }
   return s;
 }
+// 読み上げ用の天気図の名前：高気圧・低気圧・前線の数と、印を付けた地点（答えは言わない）
+const FN = { cold: "寒冷前線", warm: "温暖前線", stay: "停滞前線" };
+function mapLabel(q) { const m = q.map, H = m.centers.filter((c) => c.k === "H").length, L = m.centers.length - H, fr = [...new Set(m.fronts.map((f) => FN[f.k]))]; return `天気図：高気圧${H}つ・低気圧${L}つ${fr.length ? "・" + fr.join("・") : ""}${(q.pts || []).length ? `。印の地点：${q.pts.join("・")}` : ""}`; }
 let LAND = null;
 function mapHtml(q) {
   const m = q.map;
   if (!LAND) LAND = M.P.map((p) => `<path d="${p[1]}"/>`).join("");
-  const centers = m.centers.filter((c) => c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH).map((c) => `<text x="${c.x}" y="${c.y}" font-size="46" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text><text x="${c.x}" y="${c.y + 38}" font-size="24" fill="#26323a" text-anchor="middle">${c.p}</text>`).join("");
-  const edge = m.centers.filter((c) => !(c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH)).map((c) => { const x = Math.max(X0 + 30, Math.min(X0 + VW - 30, c.x)), y = Math.max(Y0 + 30, Math.min(Y0 + VH - 30, c.y)); return `<text x="${x}" y="${y}" font-size="42" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text>`; }).join("");
+  const centers = m.centers.filter((c) => c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH).map((c) => `<text x="${c.x}" y="${c.y}" font-size="46" class="c${c.k}" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text><text x="${c.x}" y="${c.y + 38}" font-size="24" fill="#26323a" text-anchor="middle">${c.p}</text>`).join("");
+  const edge = m.centers.filter((c) => !(c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH)).map((c) => { const x = Math.max(X0 + 30, Math.min(X0 + VW - 30, c.x)), y = Math.max(Y0 + 30, Math.min(Y0 + VH - 30, c.y)); return `<text x="${x}" y="${y}" font-size="42" class="c${c.k}" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text>`; }).join("");
   const pts = (q.pts || []).map((n, i) => { const c = G.city(n); return `<circle cx="${c[1]}" cy="${c[2]}" r="11" fill="#ffd36b" stroke="#26323a" stroke-width="3"/><text x="${c[1] + 14}" y="${c[2] - 12}" font-size="32" font-weight="800" fill="#26323a" paint-order="stroke" stroke="#fff" stroke-width="5">${n}</text>`; }).join("");
-  return `<svg viewBox="${X0} ${Y0} ${VW} ${VH}" role="img" aria-label="天気図"><rect x="${X0}" y="${Y0}" width="${VW}" height="${VH}" fill="#dce9f3"/><g fill="#eadfbf" stroke="#eadfbf" stroke-width="1.5">${LAND}</g>${isobars(m)}${m.fronts.map(frontSvg).join("")}${centers}${edge}${pts}<text x="${X0 + VW - 14}" y="${Y0 + 30}" font-size="26" text-anchor="end" fill="#5b6f80">↑北</text></svg>`;
+  return `<svg viewBox="${X0} ${Y0} ${VW} ${VH}" role="img" aria-label="${mapLabel(q)}"><rect x="${X0}" y="${Y0}" width="${VW}" height="${VH}" fill="#dce9f3"/><g fill="#eadfbf" stroke="#eadfbf" stroke-width="1.5">${LAND}</g>${isobars(m)}${m.fronts.map(frontSvg).join("")}${centers}${edge}${pts}<text x="${X0 + VW - 14}" y="${Y0 + 30}" font-size="26" text-anchor="end" fill="#5b6f80">↑北</text></svg>`;
 }
 // 答えたあとに重ねる絵：天気図じゅうの風の矢印（高気圧から吹き出し、低気圧へ吹き込む流れ）と、聞いた地点の太い矢印・天気の印。
 // 矢印は gen.js の wind（答えと同じ計算）から描く。長さは風の強さ。答える前には出さない（答えを言わない）
@@ -326,8 +490,8 @@ function home() {
   app.innerHTML = `
     <h1 class="title">天気図よみ</h1>
     <div class="map" aria-hidden="true">${mapHtml(sample)}</div>
-    <p class="lead">等圧線・高気圧・前線から、風と天気を読む。<br>だれでも同じ1日5問。</p>
-    ${done ? `<div class="share">今日の結果　${done.r.map(sq).join("")}</div>` : ""}
+    <p class="lead" data-a11y-say>等圧線・高気圧・前線から、風と天気を読む。<br>だれでも同じ1日5問。</p>
+    ${done ? `<div class="share">今日の結果　${done.r.map(sq).join("")} ${nOk(done)}/${done.r.length}</div>` : ""}
     <button class="main" id="go-d">${done ? "今日の結果を見る" : rd ? `続きから（${rd.res.length + 1}問目）` : `今日の5問を読む <small>#${dayNo(k)}</small>`}</button>
     ${done ? `<button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：8方位の風向きと天気の5問"}</button>` : ""}
     ${(() => { const re = s.runs.e && !doneOf(s.runs.e) ? s.runs.e : null; return `<button class="main alt" id="go-e">${re ? `とことんの続きから（${re.res.length + 1}問目）` : "とことん：何問続けて読める？"}${s.ebest ? ` <small>自己ベスト ${s.ebest}問</small>` : ""}</button>`; })()}
@@ -390,11 +554,11 @@ function play() {
   cur = { i, date: run.date, id: run.id, it, q, done: false, hard: run.mode === "h" };
   app.innerHTML = `
     <header><button class="icon" id="back" aria-label="もどる">←</button>
-      ${en ? `<span class="life" id="life" aria-label="まちがえてよい回数 ${run.life}">${lifeStr(run.life)}</span><span style="font-size:13px;color:var(--ink2)">${ELV[it.lv]}・${NAME[it.t]} ${i + 1}問目${s.ebest ? `（ベスト ${s.ebest}）` : ""}</span></header>` : `<div class="dots" aria-label="${i + 1}問目／${run.list.length}問">${run.list.map((_, j) => `<i class="${j < i ? (run.res[j] ? "done" : "on") : j === i ? "on" : ""}"></i>`).join("")}</div>
+      ${en ? `<span class="life" id="life" aria-label="まちがえてよい回数 ${run.life}">${lifeStr(run.life)}</span><span style="font-size:13px;color:var(--ink2)">${ELV[it.lv]}・${NAME[it.t]} ${i + 1}問目${s.ebest ? `（ベスト ${s.ebest}）` : ""}</span></header>` : `<div class="dots" role="img" aria-label="${i + 1}問目／${run.list.length}問（正解${nok}・まちがい${i - nok}）">${run.list.map((_, j) => `<i class="${j < i ? (run.res[j] ? "done" : "miss") : j === i ? "on" : ""}"></i>`).join("")}</div>
       <span style="font-size:13px;color:var(--ink2)">${run.mode === "h" ? "上級・" : run.mode === "p" ? "練習・" : run.mode === "a" ? `${md(run.date)}・` : ""}${NAME[it.t]} ${i + 1}/${run.list.length}</span></header>`}
     <div class="map" id="mp">${mapHtml(q)}</div>
-    <div class="legend"><span><b style="color:#2f6fd0">高</b> 高気圧</span><span><b style="color:#d2492f">低</b> 低気圧</span><span>線：等圧線（4hPaごと）</span><span class="wleg" id="wleg" hidden>→ 風の向き（長いほど強い）</span></div>
-    <p class="q">${esc(q.ask)}</p>
+    <div class="legend"><span><b style="color:#1f5cb8">高</b> 高気圧</span><span><b style="color:#b5361f">低</b> 低気圧</span><span>線：等圧線（4hPaごと）</span><span class="wleg" id="wleg" hidden>→ 風の向き（長いほど強い）</span></div>
+    <p class="q" data-a11y-say>${esc(q.ask)}</p>
     <div class="ch${q.choices.length === 8 ? " c8" : ""}" id="ch">${q.choices.map((c) => `<button data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
     <div id="after"></div>
     ${en ? `<p class="note">まちがえると🎫を1枚使います（🎫が無いときにまちがえると終わり）。</p><button class="sub" id="quit" style="width:100%">ここで降りる（${nok}問で終える）</button>` : ""}`;
@@ -411,16 +575,16 @@ function answer(c) {
   cur.done = true;
   const ok = c === cur.q.ans; buzz(ok ? [10, 40, 10] : 40);
   const s = save((s) => { const r = s.runs[MODE]; if (!same(r)) return; r.res.push(ok ? 1 : 0); if (ok) { s.ok++; s.got[cur.it.t] = (s.got[cur.it.t] || 0) + 1; } if (r.mode === "e" && !ok) { if ((r.life || 0) > 0) r.life--; else r.over = true; } }); // とことんはまちがい1回で🎫1枚。🎫が無いときにまちがえたら終わり
-  $("ch").querySelectorAll("button").forEach((b) => { b.disabled = true; if (b.dataset.c === cur.q.ans) b.classList.add("ok"); else if (b.dataset.c === c) b.classList.add("ng"); });
+  $("ch").querySelectorAll("button").forEach((b) => { b.disabled = true; const mk = b.dataset.c === cur.q.ans ? ["ok", "✓", "正解"] : b.dataset.c === c ? ["ng", "✕", "まちがい"] : null; if (mk) { b.classList.add(mk[0]); b.insertAdjacentHTML("beforeend", `<span class="mk" aria-hidden="true">${mk[1]}</span>`); b.setAttribute("aria-label", `${b.dataset.c}（${mk[2]}${b.dataset.c === c ? "・えらんだ答え" : ""}）`); } });
   // 答え合わせ：天気図に風の流れと、聞いた地点の風・天気を重ねる（なぜその答えかが絵で分かる）
   const svg = $("mp") && $("mp").querySelector("svg"); if (svg && !$("wl")) { svg.insertAdjacentHTML("beforeend", windLayer(cur.q)); $("wleg").hidden = false; }
   const r = s.runs[MODE], fin = doneOf(r), en = r && r.mode === "e";
   if (en && $("life")) { $("life").innerHTML = lifeStr(r.life || 0); $("life").setAttribute("aria-label", "まちがえてよい回数 " + (r.life || 0)); }
   if (en && $("quit")) $("quit").hidden = true;
   const tk = en && !ok ? `<p class="note" id="etk">${r.over ? "🎫が無いので、とことんはここまで" : `🎫を1枚使いました（のこり${r.life}枚）`}</p>` : "";
-  $("after").innerHTML = `<div class="verdict" role="status"><div class="hd">${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
+  $("after").innerHTML = `<div class="verdict" role="status" data-a11y-say><div class="hd">${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
   $("next").onclick = play;
-  setTimeout(() => { if ($("next") && cur.done) $("next").scrollIntoView({ behavior: "smooth", block: "nearest" }); }, 60);
+  setTimeout(() => { if ($("next") && cur.done) $("next").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "nearest" }); }, 60);
 }
 
 function finish() {
@@ -547,7 +711,7 @@ function cal(ym) {
     <header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>カレンダー${st >= 1 ? `<small>連続 ${st}日</small>` : ""}</h1><span></span></header>
     <div class="calnav"><button class="sub" id="prev" aria-label="前の月"${ym <= ymOf(EPOCH) ? " disabled" : ""}>‹</button><b>${y}年${m}月</b><button class="sub" id="next" aria-label="次の月"${ym >= ymOf(k) ? " disabled" : ""}>›</button></div>
     <div class="cal">${["日", "月", "火", "水", "木", "金", "土"].map((w) => `<span class="wd">${w}</span>`).join("")}${cells.join("")}</div>
-    <div class="calleg"><span><em style="background:#2f5d7a"></em>全問正解</span><span><em style="background:#b9d2e3"></em>3〜4問</span><span><em style="background:#e4eef5;border:1px solid #26323a22"></em>0〜2問</span><span>↺ あとから</span><span>上 上級</span></div>
+    <div class="calleg"><span><em style="background:#2f5d7a"></em>★★★ 全問正解</span><span><em style="background:#b9d2e3"></em>★★ 3〜4問</span><span><em style="background:#e4eef5;border:1px solid #26323a22"></em>★ 0〜2問</span><span>↺ あとから</span><span>上 上級</span></div>
     ${late.length ? `<p class="note">▶ の日は、その日の5問をあとから遊べます（過去7日まで・連続の日には数えません）。</p>` : ""}
     ${footer()}`;
   $("back").onclick = home;

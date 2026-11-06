@@ -356,7 +356,7 @@ function moreList(list) { const seen = new Set(list.map((it) => it.seed)), [ts, 
 // ebest：とことんで正解した数の自己ベスト（今日の記録・連続・Ko-fi・シェアには数えない）
 const fresh = () => ({ v: 1, days: {}, hdays: {}, adays: {}, got: {}, ok: 0, runs: {}, tut: false, kofi: {}, ebest: 0 });
 let MODE = "d";
-let mem = null; // 保存できない環境では、開いているあいだだけここに置く
+let mem = null, saveWarned = false; /* 保存に失敗したら1回だけ知らせる（2026-11-06 CodeRabbit） */ // 保存できない環境では、開いているあいだだけここに置く
 // 途中経過はとことんだけ回の id で見分ける（並びを後ろに足すため）。
 // 保存に失敗したあとはメモリと保存の両方を読む。記録は合わせて数は高いほう、途中経過は同じ日・同じ問題なら進んだほう
 const doneOf = (r) => !!r && (r.res.length >= r.list.length || !!r.over), recOf = (r) => ({ r: r.res.slice() });
@@ -368,7 +368,7 @@ function bank(s, r) { const b = doneOf(r) ? bookOf(s, r.mode) : null; if (!b || 
 const preferDays = (s) => { s.adays = s.adays || {}; for (const d in s.days) delete s.adays[d]; return s; };
 function load() { let a = null, b = null; try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {} if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null; if (!a || !b) return preferDays(Object.assign(fresh(), a || b || {})); a = Object.assign(fresh(), a); b = Object.assign(fresh(), b); const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a]; const s = Object.assign(fresh(), n); for (const k in o) { if (k === "runs" || k === "t") continue; const x = o[k], y = n[k]; if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); } else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y); else if (x === true) s[k] = true; } const ra = a.runs || {}, rb = b.runs || {}, prog = (r) => (r.res ? r.res.length : 0), idOf = (r) => JSON.stringify(r.mode === "e" ? [r.id || null] : [r.list || null, r.id || null]); s.runs = Object.assign({}, n.runs); for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) { const x = ra[m], y = rb[m]; if (x === undefined || y === undefined) { if (x || y) s.runs[m] = x || y; continue; } if (!x || !y) { const r = x || y; if (!r || bank(s, r) || doneOf(r)) continue; const bd = bookOf(s, r.mode); if (bd && !bd[r.date]) s.runs[m] = r; continue; } if (x.date !== y.date) { const [w, l] = x.date > y.date ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; } else if (idOf(x) === idOf(y)) { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; } } return preferDays(s); }
 // 保存の前に読み直す（別のタブで進めた記録を消さない）
-function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }
+function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; saveWarned = false; } catch (e) { mem = j; if (!saveWarned) { saveWarned = true; toast("記録を保存できませんでした。閉じると、ここからの記録は残りません"); } } return s; }
 const prevDay = (k) => new Date(Date.parse(k) - 864e5).toISOString().slice(0, 10);
 function streak(days) { let k = todayKey(), n = 0; if (!days[k]) k = prevDay(k); while (days[k]) { n++; k = prevDay(k); } return n; }
 const RANKS = [[0, "空を見上げる人"], [20, "天気図の読み手"], [80, "お天気博士"], [250, "予報の名人"], [600, "空の達人"]];
@@ -727,7 +727,7 @@ function cal(ym) {
   bindFooter(); window.scrollTo(0, 0);
 }
 
-window.__tk = { mode: () => MODE, endlessList, moreList, ERAMP, G, dailyList, hardList, qOf, todayKey, dayNo, shareText, streak, load, lateDays, ACH, achGot, nextAch, tally, cal, windLayer, runKey, cur: () => cur, answer: (c) => answer(c), play: (m) => { if (m) MODE = m; play(); } };
+window.__tk = { mode: () => MODE, save, endlessList, moreList, ERAMP, G, dailyList, hardList, qOf, todayKey, dayNo, shareText, streak, load, lateDays, ACH, achGot, nextAch, tally, cal, windLayer, runKey, cur: () => cur, answer: (c) => answer(c), play: (m) => { if (m) MODE = m; play(); } };
 home();
 if ("serviceWorker" in navigator && location.protocol === "https:" && /github\.io$/.test(location.hostname)) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>

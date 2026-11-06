@@ -115,7 +115,6 @@ footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:cente
 .legend .wleg{color:#b5361f;font-weight:800}
 /* 実績・カレンダー */
 .badge{background:var(--route);color:#fff;border-radius:9px;padding:1px 6px;font-size:12px}
-.life{font-size:18px;letter-spacing:2px;white-space:nowrap}.life .off{opacity:.25}
 .achnext{text-align:center;font-size:13px;color:var(--ink2);margin:0}
 .achnew{text-align:center;font-size:14px;font-weight:800;color:var(--route2);margin:0;animation:up .35s ease-out}
 .agrp{font-size:13px;color:var(--ink2);margin:4px 0 -6px;font-weight:800;letter-spacing:.1em}
@@ -318,7 +317,7 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
     <li>答えると、天気図に風の矢印（長いほど強い）と読み方の説明が出ます。</li>
   </ol>
   <p>前線：赤い半円は温暖前線、青い三角は寒冷前線、赤と青が交互なのは停滞前線。天気図は練習用に作った架空のものです（本物の予報ではありません）。</p>
-  <p>今日の5問はだれでも同じで1日1回。時間制限はありません。</p>
+  <p>今日の5問はだれでも同じで1日1回。上級もはじめから遊べます。練習と「とことん」は何度でも、まちがえても続けられます。時間制限はありません。</p>
   <p><a href="#" data-a11y-open>見やすさの設定（文字・色・動き・読み上げ）</a>　<a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
   <button class="main" id="howto-ok" style="width:100%">わかった</button>
 </dialog>
@@ -344,8 +343,12 @@ const cache = new Map();
 const qOf = (it) => { const k = it.seed + ":" + it.t + ":" + it.h; if (!cache.has(k)) cache.set(k, G.makeQ(it.seed, it.t, !!it.h)); return cache.get(k); };
 const NAME = { season: "季節", strong: "風の強さ", wind: "風向き", weather: "天気" };
 // とことん：やさしい5問（季節・風の強さ）→ ふつう15問（4つの種類）→ むずかしい80問（8方位の風向き・風の強さ・天気）。毎回ちがう種で次々に出す（乱数は練習ととことんだけ）
-const ELIFE = 3, ELV = ["やさしい", "ふつう", "むずかしい"], ERAMP = [[["season", "strong"], 0, 5], [["season", "strong", "wind", "weather"], 0, 15], [["wind", "strong", "weather"], 1, 80]];
-function endlessList() { const out = [], seen = new Set(); ERAMP.forEach(([ts, h, n], lv) => { for (let j = 0; j < n; j++) { let seed; do seed = Math.floor(Math.random() * 2 ** 31); while (seen.has(seed)); seen.add(seed); out.push({ seed, t: ts[Math.floor(Math.random() * ts.length)], h, lv }); } }); return out; }
+const ELV = ["やさしい", "ふつう", "むずかしい"], ERAMP = [[["season", "strong"], 0, 5], [["season", "strong", "wind", "weather"], 0, 15], [["wind", "strong", "weather"], 1, 80]];
+const eItem = (seen, ts, h, lv) => { let seed; do seed = Math.floor(Math.random() * 2 ** 31); while (seen.has(seed)); seen.add(seed); return { seed, t: ts[Math.floor(Math.random() * ts.length)], h, lv }; };
+function endlessList() { const out = [], seen = new Set(); ERAMP.forEach(([ts, h, n], lv) => { for (let j = 0; j < n; j++) out.push(eItem(seen, ts, h, lv)); }); return out; }
+// 並びの終わりが近づいたら、むずかしい問題を40問ずつ後ろに足して続ける（1回の中で同じ種は出さない。「ここで降りる」まで終わらない）
+const ADD = 40;
+function moreList(list) { const seen = new Set(list.map((it) => it.seed)), [ts, h] = ERAMP[2], out = []; for (let j = 0; j < ADD; j++) out.push(eItem(seen, ts, h, 2)); return out; }
 
 // ---- 記録（この端末の localStorage だけ）----
 // 進行中の遊びはモードごとに分けて持つ（練習を始めても今日・上級の途中経過を消さない）。got：問題の種類 → 正解の数
@@ -354,6 +357,7 @@ function endlessList() { const out = [], seen = new Set(); ERAMP.forEach(([ts, h
 const fresh = () => ({ v: 1, days: {}, hdays: {}, adays: {}, got: {}, ok: 0, runs: {}, tut: false, kofi: {}, ebest: 0 });
 let MODE = "d";
 let mem = null; // 保存できない環境では、開いているあいだだけここに置く
+// 途中経過はとことんだけ回の id で見分ける（並びを後ろに足すため）。
 // 保存に失敗したあとはメモリと保存の両方を読む。記録は合わせて数は高いほう、途中経過は同じ日・同じ問題なら進んだほう
 const doneOf = (r) => !!r && (r.res.length >= r.list.length || !!r.over), recOf = (r) => ({ r: r.res.slice() });
 // 終わった今日・上級の回を日ごとの記録に入れる（結果を見る前に別のタブが次の日を保存しても、終えた日を失わない）
@@ -362,7 +366,7 @@ const bookOf = (s, m) => (m === "d" ? s.days : m === "h" ? s.hdays : m === "a" ?
 function bank(s, r) { const b = doneOf(r) ? bookOf(s, r.mode) : null; if (!b || b[r.date] || (r.mode === "a" && s.days[r.date])) return false; if (r.mode === "d") delete s.adays[r.date]; b[r.date] = recOf(r); return true; }
 // 同じ日に今日の5問とあとからの両方があれば、今日の5問を残す（0時をまたいだ別のタブで二重に数えない）
 const preferDays = (s) => { s.adays = s.adays || {}; for (const d in s.days) delete s.adays[d]; return s; };
-function load() { let a = null, b = null; try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {} if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null; if (!a || !b) return preferDays(Object.assign(fresh(), a || b || {})); a = Object.assign(fresh(), a); b = Object.assign(fresh(), b); const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a]; const s = Object.assign(fresh(), n); for (const k in o) { if (k === "runs" || k === "t") continue; const x = o[k], y = n[k]; if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); } else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y); else if (x === true) s[k] = true; } const ra = a.runs || {}, rb = b.runs || {}, prog = (r) => (r.res ? r.res.length : 0), idOf = (r) => JSON.stringify([r.list || null, r.id || null]); s.runs = Object.assign({}, n.runs); for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) { const x = ra[m], y = rb[m]; if (x === undefined || y === undefined) { if (x || y) s.runs[m] = x || y; continue; } if (!x || !y) { const r = x || y; if (!r || bank(s, r) || doneOf(r)) continue; const bd = bookOf(s, r.mode); if (bd && !bd[r.date]) s.runs[m] = r; continue; } if (x.date !== y.date) { const [w, l] = x.date > y.date ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; } else if (idOf(x) === idOf(y)) { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; } } return preferDays(s); }
+function load() { let a = null, b = null; try { b = JSON.parse(localStorage.getItem(KEY)); } catch (e) {} try { a = mem !== null ? JSON.parse(mem) : null; } catch (e) {} if (a && a.v !== 1) a = null; if (b && b.v !== 1) b = null; if (!a || !b) return preferDays(Object.assign(fresh(), a || b || {})); a = Object.assign(fresh(), a); b = Object.assign(fresh(), b); const [n, o] = (a.t || 0) >= (b.t || 0) ? [a, b] : [b, a]; const s = Object.assign(fresh(), n); for (const k in o) { if (k === "runs" || k === "t") continue; const x = o[k], y = n[k]; if (x && y && typeof x === "object" && typeof y === "object") { s[k] = Object.assign({}, x, y); for (const q in x) if (typeof x[q] === "number" && typeof y[q] === "number") s[k][q] = Math.max(x[q], y[q]); } else if (typeof x === "number" && typeof y === "number") s[k] = Math.max(x, y); else if (x === true) s[k] = true; } const ra = a.runs || {}, rb = b.runs || {}, prog = (r) => (r.res ? r.res.length : 0), idOf = (r) => JSON.stringify(r.mode === "e" ? [r.id || null] : [r.list || null, r.id || null]); s.runs = Object.assign({}, n.runs); for (const m of new Set([...Object.keys(ra), ...Object.keys(rb)])) { const x = ra[m], y = rb[m]; if (x === undefined || y === undefined) { if (x || y) s.runs[m] = x || y; continue; } if (!x || !y) { const r = x || y; if (!r || bank(s, r) || doneOf(r)) continue; const bd = bookOf(s, r.mode); if (bd && !bd[r.date]) s.runs[m] = r; continue; } if (x.date !== y.date) { const [w, l] = x.date > y.date ? [x, y] : [y, x]; bank(s, l); s.runs[m] = w; } else if (idOf(x) === idOf(y)) { const px = prog(x), py = prog(y); s.runs[m] = px > py ? x : py > px ? y : n.runs[m]; } } return preferDays(s); }
 // 保存の前に読み直す（別のタブで進めた記録を消さない）
 function save(fn) { const s = load(); fn(s); s.t = Math.max(Date.now(), (s.t || 0) + 1); const j = JSON.stringify(s); try { localStorage.setItem(KEY, j); mem = null; } catch (e) { mem = j; } return s; }
 const prevDay = (k) => new Date(Date.parse(k) - 864e5).toISOString().slice(0, 10);
@@ -497,7 +501,7 @@ function home() {
     <p class="lead" data-a11y-say>等圧線・高気圧・前線から、風と天気を読む。<br>だれでも同じ1日5問。</p>
     ${done ? `<div class="share">今日の結果　${done.r.map(sq).join("")} ${nOk(done)}/${done.r.length}</div>` : ""}
     <button class="main" id="go-d">${done ? "今日の結果を見る" : rd ? `続きから（${rd.res.length + 1}問目）` : `今日の5問を読む <small>#${dayNo(k)}</small>`}</button>
-    ${done ? `<button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：8方位の風向きと天気の5問"}</button>` : ""}
+    <button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：8方位の風向きと天気の5問"}</button>
     ${(() => { const re = s.runs.e && !doneOf(s.runs.e) ? s.runs.e : null; return `<button class="main alt" id="go-e">${re ? `とことんの続きから（${re.res.length + 1}問目）` : "とことん：何問続けて読める？"}${s.ebest ? ` <small>自己ベスト ${s.ebest}問</small>` : ""}</button>`; })()}
     <div class="row"><button class="sub" id="go-p">練習（何度でも）</button><button class="sub" id="go-dex">読めた数 ${s.ok}</button></div>
     <div class="row"><button class="sub" id="go-cal" aria-label="カレンダー${late.length ? `（あとから遊べる日 ${late.length}）` : ""}">カレンダー${late.length ? ` <small class="badge">▶${late.length}</small>` : ""}</button><button class="sub" id="go-ach">実績 ${ag}/${ACH.length}</button></div>
@@ -536,7 +540,7 @@ function startRun(mode, opt) {
       s.runs[runKey("a", opt)] = { mode, date: opt, list: dailyList(opt), res: [], id: "a" + opt, a0: achGot(s) };
       return;
     }
-    if (mode === "e") { const re = s.runs.e; if (re && !doneOf(re)) return; s.runs.e = { mode, date: k, list: endlessList(), res: [], life: ELIFE, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), a0: achGot(s) }; return; } // とことん：途中なら続きから（日をまたいでも続けられる）
+    if (mode === "e") { const re = s.runs.e; if (re && !doneOf(re)) return; s.runs.e = { mode, date: k, list: endlessList(), res: [], id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8), a0: achGot(s) }; return; } // とことん：途中なら続きから（日をまたいでも続けられる）
     if (mode !== "p" && s.runs[mode] && s.runs[mode].date === k) return; // 続きから
     if ((mode === "d" && s.days[k]) || (mode === "h" && s.hdays[k])) return; // 別のタブで今日の分を終えていたら、もう一度は始めない（ホームに戻る）
     const list = mode === "d" ? dailyList(k) : mode === "h" ? hardList(k) : [0, 1, 2, 3, 4].map(() => ({ seed: Math.floor(Math.random() * 2 ** 31), t: opt, h: 0 }));
@@ -558,34 +562,32 @@ function play() {
   cur = { i, date: run.date, id: run.id, it, q, done: false, hard: run.mode === "h" };
   app.innerHTML = `
     <header><button class="icon" id="back" aria-label="もどる">←</button>
-      ${en ? `<span class="life" id="life" aria-label="まちがえてよい回数 ${run.life}">${lifeStr(run.life)}</span><span style="font-size:13px;color:var(--ink2)">${ELV[it.lv]}・${NAME[it.t]} ${i + 1}問目${s.ebest ? `（ベスト ${s.ebest}）` : ""}</span></header>` : `<div class="dots" role="img" aria-label="${i + 1}問目／${run.list.length}問（正解${nok}・まちがい${i - nok}）">${run.list.map((_, j) => `<i class="${j < i ? (run.res[j] ? "done" : "miss") : j === i ? "on" : ""}"></i>`).join("")}</div>
+      ${en ? `<span style="font-size:13px;color:var(--ink2)">${ELV[it.lv]}・${NAME[it.t]} ${i + 1}問目（正解${nok}）${s.ebest ? `・ベスト ${s.ebest}` : ""}</span></header>` : `<div class="dots" role="img" aria-label="${i + 1}問目／${run.list.length}問（正解${nok}・まちがい${i - nok}）">${run.list.map((_, j) => `<i class="${j < i ? (run.res[j] ? "done" : "miss") : j === i ? "on" : ""}"></i>`).join("")}</div>
       <span style="font-size:13px;color:var(--ink2)">${run.mode === "h" ? "上級・" : run.mode === "p" ? "練習・" : run.mode === "a" ? `${md(run.date)}・` : ""}${NAME[it.t]} ${i + 1}/${run.list.length}</span></header>`}
     <div class="map" id="mp">${mapHtml(q)}</div>
     <div class="legend"><span><b style="color:#1f5cb8">高</b> 高気圧</span><span><b style="color:#b5361f">低</b> 低気圧</span><span>線：等圧線（4hPaごと）</span><span class="wleg" id="wleg" hidden>→ 風の向き（長いほど強い）</span></div>
     <p class="q" data-a11y-say>${esc(q.ask)}</p>
     <div class="ch${q.choices.length === 8 ? " c8" : ""}" id="ch">${q.choices.map((c) => `<button data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
     <div id="after"></div>
-    ${en ? `<p class="note">まちがえると🎫を1枚使います（🎫が無いときにまちがえると終わり）。</p><button class="sub" id="quit" style="width:100%">ここで降りる（${nok}問で終える）</button>` : ""}`;
+    ${en ? `<p class="note">まちがえても続けられます。「ここで降りる」まで何問でも。</p><button class="sub" id="quit" style="width:100%">ここで降りる（${nok}問で終える）</button>` : ""}`;
   $("back").onclick = home;
   if ($("quit")) $("quit").onclick = () => finish();
   $("ch").querySelectorAll("button").forEach((b) => (b.onclick = () => answer(b.dataset.c)));
   window.scrollTo(0, 0);
 }
-const lifeStr = (n) => "🎫".repeat(Math.max(0, n)) + `<span class="off">${"🎫".repeat(Math.max(0, ELIFE - n))}</span>`;
 const same = (r) => r && cur && r.date === cur.date && r.id === cur.id && r.res.length === cur.i && !r.over;
 function answer(c) {
   if (cur.done) return;
   if (!same(load().runs[MODE])) { toast("別の画面で先に進んでいます"); return play(); }
   cur.done = true;
   const ok = c === cur.q.ans; buzz(ok ? [10, 40, 10] : 40);
-  const s = save((s) => { const r = s.runs[MODE]; if (!same(r)) return; r.res.push(ok ? 1 : 0); if (ok) { s.ok++; s.got[cur.it.t] = (s.got[cur.it.t] || 0) + 1; } if (r.mode === "e" && !ok) { if ((r.life || 0) > 0) r.life--; else r.over = true; } }); // とことんはまちがい1回で🎫1枚。🎫が無いときにまちがえたら終わり
+  const s = save((s) => { const r = s.runs[MODE]; if (!same(r)) return; r.res.push(ok ? 1 : 0); if (ok) { s.ok++; s.got[cur.it.t] = (s.got[cur.it.t] || 0) + 1; } if (r.mode === "e" && r.res.length >= r.list.length - 5) r.list.push(...moreList(r.list)); }); // とことんはまちがえても終わらない。並びの終わりが近づいたら後ろに足す（前の版の回の life は読まない。over で終わった回は結果へ）
   $("ch").querySelectorAll("button").forEach((b) => { b.disabled = true; const mk = b.dataset.c === cur.q.ans ? ["ok", "✓", "正解"] : b.dataset.c === c ? ["ng", "✕", "まちがい"] : null; if (mk) { b.classList.add(mk[0]); b.insertAdjacentHTML("beforeend", `<span class="mk" aria-hidden="true">${mk[1]}</span>`); b.setAttribute("aria-label", `${b.dataset.c}（${mk[2]}${b.dataset.c === c ? "・えらんだ答え" : ""}）`); } });
   // 答え合わせ：天気図に風の流れと、聞いた地点の風・天気を重ねる（なぜその答えかが絵で分かる）
   const svg = $("mp") && $("mp").querySelector("svg"); if (svg && !$("wl")) { svg.insertAdjacentHTML("beforeend", windLayer(cur.q)); $("wleg").hidden = false; }
   const r = s.runs[MODE], fin = doneOf(r), en = r && r.mode === "e";
-  if (en && $("life")) { $("life").innerHTML = lifeStr(r.life || 0); $("life").setAttribute("aria-label", "まちがえてよい回数 " + (r.life || 0)); }
   if (en && $("quit")) $("quit").hidden = true;
-  const tk = en && !ok ? `<p class="note" id="etk">${r.over ? "🎫が無いので、とことんはここまで" : `🎫を1枚使いました（のこり${r.life}枚）`}</p>` : "";
+  const tk = en && !ok ? `<p class="note" id="etk">まちがえても、とことんは続きます</p>` : "";
   $("after").innerHTML = `<div class="verdict" role="status" data-a11y-say><div class="hd">${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
   $("next").onclick = play;
   setTimeout(() => { if ($("next") && cur.done) $("next").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "nearest" }); }, 60);
@@ -725,7 +727,7 @@ function cal(ym) {
   bindFooter(); window.scrollTo(0, 0);
 }
 
-window.__tk = { mode: () => MODE, endlessList, ELIFE, ERAMP, G, dailyList, hardList, qOf, todayKey, dayNo, shareText, streak, load, lateDays, ACH, achGot, nextAch, tally, cal, windLayer, runKey, cur: () => cur, answer: (c) => answer(c), play: (m) => { if (m) MODE = m; play(); } };
+window.__tk = { mode: () => MODE, endlessList, moreList, ERAMP, G, dailyList, hardList, qOf, todayKey, dayNo, shareText, streak, load, lateDays, ACH, achGot, nextAch, tally, cal, windLayer, runKey, cur: () => cur, answer: (c) => answer(c), play: (m) => { if (m) MODE = m; play(); } };
 home();
 if ("serviceWorker" in navigator && location.protocol === "https:" && /github\.io$/.test(location.hostname)) navigator.serviceWorker.register("sw.js").catch(() => {});
 </script>

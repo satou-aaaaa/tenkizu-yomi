@@ -494,8 +494,9 @@ try {
     check("読めた数からも手引きを開け、もどると読めた数に帰る", (await pg.textContent("header")).includes("読めた数"));
     await pg.close();
     const pe = await newPage();
+    await pe.waitForFunction(() => document.getElementById("howto").open); // 窓が開いてから Esc を押す（開く前に押すと何も起きない）
     await pe.keyboard.press("Escape");
-    check("遊び方を Esc で閉じても、次に開いたときは遊び方を出さない", await pe.evaluate(() => window.__tk.load().tut === true));
+    check("遊び方を Esc で閉じても、次に開いたときは遊び方を出さない", await pe.waitForFunction(() => !document.getElementById("howto").open && window.__tk.load().tut === true, null, { timeout: 3000 }).then(() => true, () => false));
     await pe.reload();
     check("（続き）開き直しても遊び方は閉じたまま", !(await pe.evaluate(() => document.getElementById("howto").open)));
     await pe.click("#f-how"); await pe.click("#howto-guide");

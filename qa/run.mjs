@@ -45,6 +45,36 @@ const G = T;
   check("答えがかたよらない（季節4つ・天気の晴れと雨がどれも15%以上）", ["season冬", "season夏", "season梅雨", "season春・秋"].every((k) => cnt[k] > 225) && cnt["weather晴れ"] > 225 && cnt["weather雨"] > 225, JSON.stringify(cnt));
   check("4択の風向きは、正しい向きのとなりの方角を選択肢に入れない（45度ちがいで迷わせない）", !bad.some((x) => x.includes("となり")));
 }
+// 2b. 台風（練習・とことんだけ。気象庁「台風に伴う風の特性」：反時計回りに吹き込む・進む向きの右側が強い）
+{
+  // 別の数え方：台風をまわる風を「中心へ反時計回りに吹き込む向き」で直接作り、進む速さを足して比べる
+  const spdOf = (m, x, y) => { const T = m.centers.find((c) => c.k === "T"), [gx, gy] = G.grad(m, x, y), g = Math.hypot(gx, gy), rx = x - T.x, ry = y - T.y, r = Math.hypot(rx, ry);
+    const tx = ry / r, ty = -rx / r; // 画面（y が下）で反時計回りの向き
+    const ix = -rx / r, iy = -ry / r, c = Math.cos(Math.PI / 6), sn = Math.sin(Math.PI / 6); // 中心へ30度かたむける
+    return Math.hypot((tx * c + ix * sn) * g + m.tr.dx * G.TSPD, (ty * c + iy * sn) * g + m.tr.dy * G.TSPD); };
+  const bad = [], cnt = { side: 0, wind: 0 }, ans = {};
+  for (let d = 0; d < 3000; d++) {
+    const q = G.makeQ(G.seedOf(`qaT${d}`), "typhoon", false), q2 = G.makeQ(G.seedOf(`qaT${d}`), "typhoon", false);
+    if (!q) { bad.push(`${d} 作れない`); continue; }
+    if (JSON.stringify(q) !== JSON.stringify(q2)) bad.push(`${d} 同じ種で別の問題`);
+    const m = q.map, T = m.centers.find((c) => c.k === "T");
+    if (!T || !m.tr || m.tr.dy > -0.5 || Math.abs(Math.hypot(m.tr.dx, m.tr.dy) - 1) > 1e-6) bad.push(`${d} 台風と進む向き`);
+    if (!q.choices.includes(q.ans) || new Set(q.choices).size !== q.choices.length || q.pts.some((n) => !G.city(n))) bad.push(`${d} 選択肢`);
+    if (q.pts.length === 2) {
+      cnt.side++; ans[q.ans] = 1;
+      const sp = q.pts.map((n) => { const c = G.city(n); return spdOf(m, c[1], c[2]); }), hi = q.pts[sp[0] > sp[1] ? 0 : 1], c = G.city(q.ans);
+      if (hi !== q.ans || Math.max(...sp) < Math.min(...sp) * 1.25) bad.push(`${d} 強さ ${sp.map((v) => v.toFixed(3))}`);
+      if (m.tr.dx * (c[2] - T.y) - m.tr.dy * (c[1] - T.x) <= 0) bad.push(`${d} 答えが右側でない`);
+    } else {
+      cnt.wind++;
+      const c = G.city(q.pts[0]), w = G.wind(m, c[1], c[2]), r = w.deg * Math.PI / 180, bx = -Math.sin(r), by = Math.cos(r), rx = c[1] - T.x, ry = c[2] - T.y;
+      if (w.from !== q.ans || q.choices.length !== 4) bad.push(`${d} 向き`);
+      if (rx * by - ry * bx >= 0 || bx * rx + by * ry >= 0) bad.push(`${d} 反時計回りに吹き込んでいない`); // 画面で反時計回り（外積が負）で、中心へ向かう
+    }
+  }
+  check("台風の問題：答えを別の数え方で計算し直すと同じ・答えはいつも進む向きの右側・風は反時計回りに吹き込む（3000問）", bad.length === 0, bad.slice(0, 3).join(","));
+  check("台風の問題：右と左の比べと風向きの両方が出て、答えの地点がかたよらない", cnt.side > 1500 && cnt.wind > 300 && Object.keys(ans).length >= 20, JSON.stringify(cnt) + " " + Object.keys(ans).length);
+}
 
 const html = readFileSync(path.join(root, "index.html"), "utf8");
 check("終えた回を消すのは同じ回のときだけ・0時を過ぎたホームの「今日」のボタンは描き直す（2026-11-04 CodeRabbit）", /c\.date === run\.date && c\.id === run\.id\) s2\.runs\[MODE\] = null/.test(html) && /\$\("go-d"\)\.onclick = \(\) => \(k !== todayKey\(\) \? home\(\)/.test(html));
@@ -168,7 +198,7 @@ try {
   const after = await page.evaluate(() => { const s = window.__tk.load(); return { days: Object.keys(s.days).length, ok: s.ok, wind: s.got.wind }; });
   check("練習は今日の記録を増やさず、正解の数には入る（風向き5問）", after.days === 1 && after.ok === 14 && after.wind >= 5 && (await page.locator(".share").count()) === 0);
   await page.click("#go-dex");
-  check("読めた数に種類ごとの正解が出る", (await page.locator(".res div").count()) === 4);
+  check("読めた数に種類ごとの正解が出る（台風も）", (await page.locator(".res div").count()) === 5);
   await page.close();
 
 
@@ -488,8 +518,8 @@ try {
     const pg = await newPage(); await pg.click("#howto-ok");
     await pg.click("#go-p"); await pg.click("#go-guide");
     const g = await pg.evaluate(() => ({ n: document.querySelectorAll(".gd").length, src: [...document.querySelectorAll("a[href*='jma.go.jp']")].length, btn: [...document.querySelectorAll(".gd button")].map((b) => b.dataset.t), ovf: document.documentElement.scrollWidth - innerWidth }));
-    check("練習から「読み方の手引き」を開ける（5つの要点・気象庁の出どころ・横にはみ出さない）", g.n === 5 && g.src >= 1 && g.ovf <= 0, JSON.stringify(g));
-    check("手引きの要点は、等圧線・高気圧と低気圧・風向き・前線・季節の形", await pg.evaluate(() => ["等圧線", "高気圧と低気圧", "風向き", "前線", "季節の形"].every((t, i) => document.querySelectorAll(".gd h2")[i].textContent === t)));
+    check("練習から「読み方の手引き」を開ける（6つの要点・気象庁の出どころ・横にはみ出さない）", g.n === 6 && g.src >= 1 && g.ovf <= 0, JSON.stringify(g));
+    check("手引きの要点は、等圧線・高気圧と低気圧・風向き・前線・季節の形・台風", await pg.evaluate(() => ["等圧線", "高気圧と低気圧", "風向き", "前線", "季節の形", "台風"].every((t, i) => document.querySelectorAll(".gd h2")[i].textContent === t)));
     check("手引きの風向きは北半球の向き（高気圧は時計回りに吹き出し、低気圧へ反時計回りに吹き込む）", (await pg.textContent("#gd-wind")).includes("高気圧から時計回りに吹き出し、低気圧へ反時計回りに吹き込む"));
     const rec0 = await pg.evaluate(() => JSON.stringify(window.__tk.load().days));
     await pg.click("#gd-wind button");
@@ -497,6 +527,17 @@ try {
     await pg.click("#back"); await pg.click("#go-dex"); await pg.click("#go-guide"); await pg.click("#back");
     check("読めた数からも手引きを開け、もどると読めた数に帰る", (await pg.textContent("header")).includes("読めた数"));
     await pg.close();
+    try { // 台風（練習・とことんだけ）
+      const pt = await newPage(); await pt.click("#howto-ok"); await pt.click("#go-p"); await pt.click("#go-guide");
+      check("手引きの台風は、反時計回りに吹き込む・進む向きの右側が強いを書き、気象庁「台風に伴う風の特性」へのリンクがある", (await pt.textContent("#gd-typhoon")).includes("反時計回り") && (await pt.textContent("#gd-typhoon")).includes("右側") && (await pt.locator("a[href='https://www.jma.go.jp/jma/kishou/know/typhoon/2-1.html']").count()) === 1);
+      await pt.click("#gd-typhoon button");
+      const t0 = await pt.evaluate(() => ({ ts: window.__tk.load().runs.p.list.map((it) => it.t), lbl: document.querySelector("#mp svg").getAttribute("aria-label"), tai: [...document.querySelectorAll("#mp svg text")].some((e) => e.textContent === "台"), trk: document.querySelectorAll("#mp .trk path").length, ovf: document.documentElement.scrollWidth - innerWidth }));
+      check("台風の練習：5問とも台風・地図に「台」と進む向きの矢印・読み上げの名前に台風と進む向き", t0.ts.length === 5 && t0.ts.every((t) => t === "typhoon") && t0.tai && t0.trk === 3 && t0.lbl.includes("台風1つ（矢印の向きに進む）") && t0.ovf <= 0, JSON.stringify(t0));
+      for (let j = 0; j < 5; j++) { await ansNow(pt); const w = await pt.locator(".why").textContent(); if (j === 0) check("台風の説明は、右側か反時計回りのどちらかを言う", /右側|反時計回り/.test(w), w); await pt.click("#next"); }
+      check("台風の練習は今日の記録を増やさず、読めた数の「台風」に入る", await pt.evaluate(() => { const s = window.__tk.load(); return !Object.keys(s.days).length && (s.got.typhoon || 0) >= 1; }));
+      check("台風は今日の5問・上級には出ず、とことんのふつう・むずかしいに出る", await pt.evaluate(() => { const t = window.__tk; let k = "2026-11-01", bad = 0; for (let i = 0; i < 365; i++) { const d = new Date(Date.parse(k) + i * 864e5).toISOString().slice(0, 10); if ([...t.dailyList(d), ...t.hardList(d)].some((it) => it.t === "typhoon")) bad++; } return bad === 0 && t.ERAMP[0][0].indexOf("typhoon") < 0 && t.ERAMP[1][0].includes("typhoon") && t.ERAMP[2][0].includes("typhoon"); }));
+      await pt.close();
+    } catch (e) { check("台風の練習", false, e.message.split("\n")[0]); }
     const pe = await newPage();
     await pe.waitForFunction(() => document.getElementById("howto").open); // 窓が開いてから Esc を押す（開く前に押すと何も起きない）
     await pe.keyboard.press("Escape");
@@ -504,7 +545,7 @@ try {
     await pe.reload();
     check("（続き）開き直しても遊び方は閉じたまま", !(await pe.evaluate(() => document.getElementById("howto").open)));
     await pe.click("#f-how"); await pe.click("#howto-guide");
-    check("遊び方の中のリンクから手引きを開ける", (await pe.locator(".gd").count()) === 5 && !(await pe.evaluate(() => document.getElementById("howto").open)));
+    check("遊び方の中のリンクから手引きを開ける", (await pe.locator(".gd").count()) === 6 && !(await pe.evaluate(() => document.getElementById("howto").open)));
     await pe.close();
   } catch (e) { check("読み方の手引き", false, e.message.split("\n")[0]); }
   try { // 引き継ぎコード（別の端末へ記録を移す。shared-workflows template/qa/transfer-check.mjs）

@@ -1,3 +1,6 @@
 qa/node_modules/
 qa-report/
 .tools/
+# 検査のための一時リンク（/opt/node-tools/node_modules へのリンク。フォルダでなくリンクなので / を付けない）
+/node_modules
+qa/node_modules

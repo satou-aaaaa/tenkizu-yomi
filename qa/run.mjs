@@ -6,6 +6,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { checkTransfer } from "./transfer-check.mjs";
+import { checkSwStall } from "./sw-check.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const url = pathToFileURL(path.join(root, "index.html")).href;
@@ -114,6 +115,8 @@ check("画面にお笑いの言葉を入れない（本物っぽく）", !/お�
   const need = ["./index.html", "./transfer.js", "./gen.js", "./japan.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
   check("PWA：ネットの返事の保存は、イベントの中で waitUntil に預ける（遅れて届いた新しい版も保存できる）", /e\.waitUntil\(Promise\.race\(\[net\.then[^\n]*wait\(15000\)[^\n]*wait\(60000\)\]\)\)/.test(sw));
   check("PWA：sw.js は画面のファイルを全部保存し、外へ何も送らない", need.every((f) => shell.includes(f)) && !/https?:\/\//.test(sw.replace(/^\/\/.*$/gm, "")));
+  { const st = await checkSwStall(sw); check("PWA：本文の途中で通信が止まっても、4秒で保存したものを返す・ふだんはネットの返事（qa/sw-check.mjs）", st.ok, JSON.stringify(st)); }
+  check("PWA：返したら60秒の見張りも止める（drift-check の sw:deadline）", /clearTimeout\(deadline\)/.test(sw));
   check("PWA：manifest にアイコン2つと名前がある", mf.name === "天気図よみ" && mf.icons.length >= 2 && mf.start_url === "./"); }
 { const src = html + readFileSync(path.join(root, "gen.js"), "utf8");
   const bad = src.match(/\.sort\(\s*\([^)]*\)\s*=>[^\n;]*\b(R|rng|rand|Math\.random)\s*\(/g) || [];

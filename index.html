@@ -94,6 +94,11 @@ button.sub:disabled{opacity:.4;cursor:default}
 .shares a,.shares button{display:flex;align-items:center;justify-content:center;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:14px;font-weight:800;text-decoration:none;padding:0 6px;box-sizing:border-box;font-family:inherit;cursor:pointer}
 .big{font-weight:800;font-size:24px;text-align:center;margin:0}
 .res{display:flex;flex-direction:column;gap:6px}
+.guide{display:flex;flex-direction:column;gap:10px}
+.gd{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.gd h2{font-size:16px;margin:0 0 4px}
+.gd ul{margin:0 0 8px;padding-left:1.2em;font-size:14px;line-height:1.7}
+.gd button{width:100%}
 .res div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
 .res div.ng{border:1.5px dashed var(--route)}
 .res .rm{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;font-size:16px;font-weight:800;color:#fff;background:#1f6b45}
@@ -329,6 +334,7 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
   </ol>
   <p>前線：赤い半円は温暖前線、青い三角は寒冷前線、赤と青が交互なのは停滞前線。天気図は練習用に作った架空のものです（本物の予報ではありません）。</p>
   <p>今日の5問はだれでも同じで1日1回。上級もはじめから遊べます。練習と「とことん」は何度でも、まちがえても続けられます。時間制限はありません。</p>
+  <p><a href="#" id="howto-guide">読み方の手引き（等圧線・風・前線・季節の要点）</a></p>
   <p><a href="#" data-a11y-open>見やすさの設定（文字・色・動き・読み上げ）</a>　<a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
   <button class="main" id="howto-ok" style="width:100%">わかった</button>
 </dialog>
@@ -438,6 +444,8 @@ const footer = () => `<footer><a href="#" id="f-how">遊び方</a><a href="#" da
 function bindFooter() { const h = $("f-how"); if (h) h.onclick = (e) => { e.preventDefault(); openHow(); }; }
 function openHow() { $("fb2").href = FEEDBACK; const d = $("howto"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); }
 $("howto-ok").onclick = () => { const d = $("howto"); d.close ? d.close() : d.removeAttribute("open"); save((s) => { s.tut = true; }); };
+$("howto").addEventListener("close", () => { if (!load().tut) save((s) => { s.tut = true; }); }); // Esc で閉じても、次から遊び方を自動で開かない
+$("howto-guide").onclick = (e) => { e.preventDefault(); $("howto-ok").onclick(); guide(); };
 
 // 等圧線：ます目で気圧を計り、4hPa ごとの線を引く（マーチングスクエア）
 const X0 = -70, Y0 = -30, VW = 790, VH = 680, STEP = 14;
@@ -539,11 +547,32 @@ function home() {
   bindFooter();
   if (!s.tut) openHow();
 }
+// ---- 読み方の手引き（気象庁「日本周辺域 実況天気図の説明」「予報用語」から。答えを読む前に知っておくと解ける要点）----
+const GUIDE = [
+  ["isobar", "等圧線", "strong", ["同じ気圧の所を結んだ線。4hPaごとに引き、20hPaごとに太くする。", "線の間がせまい所ほど気圧の差が大きく、風が強い。"]],
+  ["hl", "高気圧と低気圧", "weather", ["「高」はまわりより気圧が高い所、「低」は低い所。", "高気圧の近くは晴れやすく、低気圧や前線の近くは雲が多く雨になりやすい。"]],
+  ["wind", "風向き", "wind", ["風は気圧の高いほうから低いほうへ、等圧線をななめに横切って吹く。", "北半球では、高気圧から時計回りに吹き出し、低気圧へ反時計回りに吹き込む。", "風向きは吹いてくる方角で言う（北から吹く風が北風）。"]],
+  ["front", "前線", "weather", ["半円は温暖前線、三角は寒冷前線、半円と三角が交互なのは停滞前線。", "前線は暖かい空気と冷たい空気の境目で、近くでは雨が降りやすい。"]],
+  ["season", "季節の形", "season", ["冬：西に高気圧・東に低気圧（西高東低）。等圧線が南北にせまく並び、日本海側は雪、太平洋側は晴れ。", "夏：南の太平洋高気圧が日本をおおう（南高北低）。", "梅雨：日本の南に停滞前線がのびる。春・秋：高気圧と低気圧が交互に西から東へ進む。"]],
+];
+const GUIDE_SRC = "https://www.jma.go.jp/jma/kishou/know/kurashi/sokuhou_kaisetu.html";
+function guide(back) {
+  app.innerHTML = `
+    <header><button class="icon" id="back" aria-label="もどる">←</button><h1>読み方の手引き<small>5つの要点</small></h1><span></span></header>
+    <div class="guide">${GUIDE.map(([id, name, t, lines]) => `<section class="gd" id="gd-${id}"><h2>${name}</h2><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><button class="sub" data-t="${t}">「${NAME[t]}」を練習する</button></section>`).join("")}</div>
+    <p class="note">出どころ：<a href="${GUIDE_SRC}" target="_blank" rel="noopener">気象庁「日本周辺域 実況天気図の説明」</a>・<a href="https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi1.html" target="_blank" rel="noopener">予報用語（気圧配置）</a>。このゲームの天気図は練習用の架空のものです。</p>
+    ${footer()}`;
+  $("back").onclick = back || home;
+  document.querySelectorAll(".gd button").forEach((b) => (b.onclick = () => startRun("p", b.dataset.t)));
+  bindFooter();
+}
 function practiceMenu() {
   app.innerHTML = `<header><button class="icon" id="back" aria-label="もどる">←</button><h1>練習<small>今日の記録には入りません（読めた数には入ります）</small></h1><span></span></header>
     <p class="note">問題の種類を選ぶと、5問出ます。</p>
+    <button class="sub" id="go-guide" style="width:100%">📘 読み方の手引き（5つの要点）</button>
     <div class="lv">${Object.keys(NAME).map((t) => `<button class="sub" data-t="${t}" style="min-height:64px">${NAME[t]}</button>`).join("")}</div>${footer()}`;
   $("back").onclick = home;
+  $("go-guide").onclick = () => guide(practiceMenu);
   document.querySelectorAll(".lv button").forEach((b) => (b.onclick = () => startRun("p", b.dataset.t)));
   bindFooter();
 }
@@ -713,8 +742,10 @@ function dex() {
     <header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>読めた数<small>正解 ${s.ok}問</small></h1><span></span></header>
     <p class="note">問題の種類ごとの正解の数です。</p>
     <div class="res">${Object.keys(NAME).map((t) => `<div><span>${NAME[t]}</span><b>${s.got[t] || 0}問</b></div>`).join("")}</div>
+    <button class="sub" id="go-guide" style="width:100%">📘 読み方の手引き（5つの要点）</button>
     ${footer()}`;
   $("back").onclick = home;
+  $("go-guide").onclick = () => guide(dex);
   bindFooter();
 }
 

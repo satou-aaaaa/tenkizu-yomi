@@ -50,7 +50,7 @@ const html = readFileSync(path.join(root, "index.html"), "utf8");
 check("終えた回を消すのは同じ回のときだけ・0時を過ぎたホームの「今日」のボタンは描き直す（2026-11-04 CodeRabbit）", /c\.date === run\.date && c\.id === run\.id\) s2\.runs\[MODE\] = null/.test(html) && /\$\("go-d"\)\.onclick = \(\) => \(k !== todayKey\(\) \? home\(\)/.test(html));
 check("別のタブで今日の分を終えたあと、古い画面から今日・上級をもう一度始めない（2026-11-04 CodeRabbit）", /\(mode === "d" && s\.days\[k\]\) \|\| \(mode === "h" && s\.hdays\[k\]\)\) return;/.test(html));
 check("README の URL のすぐ後ろに全角の字を続けない（Link check が URL の一部と読む。2026-11-04）", !/https?:\/\/[\x21-\x7e]*[^\x00-\x7f]/.test(readFileSync(new URL("../README.md", import.meta.url), "utf8").replace(/\]\(https?:\/\/[^)\s]+\)/g, "").replace(/<https?:\/\/[^>\s]+>/g, "")));
-const ext = [...html.matchAll(/(?:src|href)="(https?:[^"]+)"/g)].map((m) => m[1]).filter((u) => !/^https:\/\/fonts\.googleapis\.com(\/|$)|^https:\/\/ko-fi\.com\/satouaaaaa$/.test(u));
+const ext = [...html.matchAll(/(src|href)="(https?:[^"]+)"/g)].filter((m) => !(m[1] === "href" && /^https:\/\/www\.jma\.go\.jp\/jma\/kishou\/know\//.test(m[2]))).map((m) => m[2]).filter((u) => !/^https:\/\/fonts\.googleapis\.com(\/|$)|^https:\/\/ko-fi\.com\/satouaaaaa$/.test(u)); // 気象庁の説明へのただのリンク（手引きの出どころ）は読みこまないので許す
 check("外から読むのは文字（Google Fonts）だけ。スクリプト・広告・解析を入れない", ext.length === 0, ext.join(","));
 check("CSP で通信先を自分だけにしている", /connect-src 'self'/.test(html) && !/connect-src[^;"]*https/.test(html));
 check("Math.random は練習・とことんの問題の種だけ（今日の5問・上級は日付の種）", (html.match(/Math\.random/g) || []).length === 4 && !/Math\.random/.test(readFileSync(path.join(root, "gen.js"), "utf8")));
@@ -480,6 +480,28 @@ try {
       await pu.close();
     }
   } catch (e) { check("スマホで初めて遊ぶ人の使いやすさ", false, e.message.split("\n")[0]); }
+  try { // 読み方の手引き（気象庁の説明から。知らなくても遊べるように）
+    const pg = await newPage(); await pg.click("#howto-ok");
+    await pg.click("#go-p"); await pg.click("#go-guide");
+    const g = await pg.evaluate(() => ({ n: document.querySelectorAll(".gd").length, src: [...document.querySelectorAll("a[href*='jma.go.jp']")].length, btn: [...document.querySelectorAll(".gd button")].map((b) => b.dataset.t), ovf: document.documentElement.scrollWidth - innerWidth }));
+    check("練習から「読み方の手引き」を開ける（5つの要点・気象庁の出どころ・横にはみ出さない）", g.n === 5 && g.src >= 1 && g.ovf <= 0, JSON.stringify(g));
+    check("手引きの要点は、等圧線・高気圧と低気圧・風向き・前線・季節の形", await pg.evaluate(() => ["等圧線", "高気圧と低気圧", "風向き", "前線", "季節の形"].every((t, i) => document.querySelectorAll(".gd h2")[i].textContent === t)));
+    check("手引きの風向きは北半球の向き（高気圧は時計回りに吹き出し、低気圧へ反時計回りに吹き込む）", (await pg.textContent("#gd-wind")).includes("高気圧から時計回りに吹き出し、低気圧へ反時計回りに吹き込む"));
+    const rec0 = await pg.evaluate(() => JSON.stringify(window.__tk.load().days));
+    await pg.click("#gd-wind button");
+    check("手引きから、その種類の練習を始められる（今日の記録は増えない）", (await pg.textContent("header")).includes("練習") && (await pg.evaluate(() => window.__tk.load().runs.p.list.every((it) => it.t === "wind"))) && (await pg.evaluate(() => JSON.stringify(window.__tk.load().days))) === rec0);
+    await pg.click("#back"); await pg.click("#go-dex"); await pg.click("#go-guide"); await pg.click("#back");
+    check("読めた数からも手引きを開け、もどると読めた数に帰る", (await pg.textContent("header")).includes("読めた数"));
+    await pg.close();
+    const pe = await newPage();
+    await pe.keyboard.press("Escape");
+    check("遊び方を Esc で閉じても、次に開いたときは遊び方を出さない", await pe.evaluate(() => window.__tk.load().tut === true));
+    await pe.reload();
+    check("（続き）開き直しても遊び方は閉じたまま", !(await pe.evaluate(() => document.getElementById("howto").open)));
+    await pe.click("#f-how"); await pe.click("#howto-guide");
+    check("遊び方の中のリンクから手引きを開ける", (await pe.locator(".gd").count()) === 5 && !(await pe.evaluate(() => document.getElementById("howto").open)));
+    await pe.close();
+  } catch (e) { check("読み方の手引き", false, e.message.split("\n")[0]); }
   try { // 引き継ぎコード（別の端末へ記録を移す。shared-workflows template/qa/transfer-check.mjs）
     await checkTransfer({ browser, url, game: "tenkizu-yomi", sample: { "tenkizu-v1": JSON.stringify({ v: 1, tut: true }) }, check, open: async (p) => { await p.click("#howto-ok", { timeout: 1500 }).catch(() => {}); } });
   } catch (e) { check("引き継ぎコード", false, e.message.split("\n")[0]); }

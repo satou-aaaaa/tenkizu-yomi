@@ -199,8 +199,11 @@ for (const sc of screens) {
         if (b.width <= 2 || b.height <= 2 || (cs.clip && cs.clip !== "auto") || (cs.clipPath && cs.clipPath !== "none")) continue;
         // 自分の字か、中の span・ruby など（行の中に並ぶもの）の字が切れていないか（span の中の字を見逃していた。2026-11-07 mukashi-narabe #1 の CodeRabbit）
         const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
-        if (!own && ![...el.querySelectorAll("*")].some((c) => getComputedStyle(c).display.startsWith("inline") && !c.closest("svg,canvas,[aria-hidden=true],[hidden]") && c.textContent.trim())) continue;
-        if (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) cut.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}「${el.textContent.trim().slice(0, 10)}」`);
+        // 中の字は、その字の箱が外にはみ出しているときだけ数える（絵や積み木がはみ出すだけの入れ物を数えない）
+        const out = (c) => { const r = c.getBoundingClientRect(); return r.width > 0 && (r.bottom > b.bottom + 2 || r.right > b.right + 2 || r.top < b.top - 2 || r.left < b.left - 2); };
+        const inner = !own && [...el.querySelectorAll("*")].some((c) => getComputedStyle(c).display.startsWith("inline") && !c.closest("svg,canvas,[aria-hidden=true],[hidden]") && [...c.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && out(c));
+        if (!own && !inner) continue;
+        if (inner || el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2) cut.push(`${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}「${el.textContent.trim().slice(0, 10)}」`);
       }
       return { wide, cut };
     });
@@ -285,7 +288,13 @@ for (const sc of screens) {
   await page.reload(); await page.waitForTimeout(300);
   let odd = await page.evaluate(() => !!window.A11y && !!document.querySelector("[data-a11y-open]"));
   // ボタンがあるだけでなく、押すとダイアログが開くか（2026-11-07 mukashi-narabe #1 の CodeRabbit）
-  if (odd) { await dismiss(page); await page.click("[data-a11y-open]"); odd = await page.waitForSelector("dialog.a11y-dlg[open]", { timeout: 2000 }).then(() => true, () => false); }
+  // 押せない（隠れている・時間切れ）ときも、例外で止めずに ✗ と数える（2026-11-07 amida-haitatsu #14 の CodeRabbit）
+  if (odd) {
+    await dismiss(page);
+    odd = await page.click("[data-a11y-open]", { timeout: 3000 })
+      .then(() => page.waitForSelector("dialog.a11y-dlg[open]", { timeout: 2000 }))
+      .then(() => true, () => false);
+  }
   check("保存した見やすさの設定が壊れていても（true など）、設定を開ける", odd);
   await ctx.close();
 }

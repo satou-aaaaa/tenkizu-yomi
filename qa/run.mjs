@@ -45,6 +45,25 @@ const G = T;
   check("答えがかたよらない（季節4つ・天気の晴れと雨がどれも15%以上）", ["season冬", "season夏", "season梅雨", "season春・秋"].every((k) => cnt[k] > 225) && cnt["weather晴れ"] > 225 && cnt["weather雨"] > 225, JSON.stringify(cnt));
   check("4択の風向きは、正しい向きのとなりの方角を選択肢に入れない（45度ちがいで迷わせない）", !bad.some((x) => x.includes("となり")));
 }
+// 2c. 前線が通りすぎたあとの気温（練習・とことんだけ。気象庁「予報用語（前線）」）
+{
+  const bad = [], ans = {}, at = {};
+  for (let d = 0; d < 3000; d++) {
+    const q = G.makeQ(G.seedOf(`qaF${d}`), "front", false), q2 = G.makeQ(G.seedOf(`qaF${d}`), "front", false);
+    if (!q) { bad.push(`${d} 作れない`); continue; }
+    if (JSON.stringify(q) !== JSON.stringify(q2)) bad.push(`${d} 同じ種で別の問題`);
+    const c = G.city(q.pts[0]); if (!c) { bad.push(`${d} 地点`); continue; }
+    // 別の数え方：前線の点を細かく並べ、いちばん近い点の前線の種類を見る
+    let best = 1e9, kind = null;
+    for (const f of q.map.fronts) for (let i = 1; i < f.pts.length; i++) for (let u = 0; u <= 40; u++) { const x = f.pts[i - 1][0] + (f.pts[i][0] - f.pts[i - 1][0]) * u / 40, y = f.pts[i - 1][1] + (f.pts[i][1] - f.pts[i - 1][1]) * u / 40, dd = Math.hypot(x - c[1], y - c[2]); if (dd < best) { best = dd; kind = f.k; } }
+    const other = q.map.fronts.filter((f) => f.k !== kind).flatMap((f) => f.pts.slice(1).map((p, i) => [f.pts[i], p]));
+    if (best > 41 || { cold: "下がる", warm: "上がる" }[kind] !== q.ans || JSON.stringify(q.choices) !== '["上がる","下がる"]') bad.push(`${d} 答え ${kind} ${q.ans}`);
+    if (G.frontDist(q.map, c[1], c[2], kind === "cold" ? "warm" : "cold") <= 90) bad.push(`${d} もう一つの前線が近い`);
+    ans[q.ans] = (ans[q.ans] || 0) + 1; at[q.pts[0]] = 1;
+  }
+  check("前線の問題：いちばん近い前線を別の数え方で探すと答えと同じ（寒冷前線→下がる・温暖前線→上がる）・もう一つの前線は遠い（3000問）", bad.length === 0, bad.slice(0, 3).join(","));
+  check("前線の問題：上がる・下がるがどちらも4割以上・地点がかたよらない", ans["上がる"] > 1200 && ans["下がる"] > 1200 && Object.keys(at).length >= 15, JSON.stringify(ans) + " " + Object.keys(at).length);
+}
 // 2b. 台風（練習・とことんだけ。気象庁「台風に伴う風の特性」：反時計回りに吹き込む・進む向きの右側が強い）
 {
   // 別の数え方：台風をまわる風を「中心へ反時計回りに吹き込む向き」で直接作り、進む速さを足して比べる
@@ -198,7 +217,7 @@ try {
   const after = await page.evaluate(() => { const s = window.__tk.load(); return { days: Object.keys(s.days).length, ok: s.ok, wind: s.got.wind }; });
   check("練習は今日の記録を増やさず、正解の数には入る（風向き5問）", after.days === 1 && after.ok === 14 && after.wind >= 5 && (await page.locator(".share").count()) === 0);
   await page.click("#go-dex");
-  check("読めた数に種類ごとの正解が出る（台風も）", (await page.locator(".res div").count()) === 5);
+  check("読めた数に種類ごとの正解が出る（台風・前線も）", (await page.locator(".res div").count()) === 6);
   await page.close();
 
 
@@ -538,6 +557,15 @@ try {
       check("台風は今日の5問・上級には出ず、とことんのふつう・むずかしいに出る", await pt.evaluate(() => { const t = window.__tk; let k = "2026-11-01", bad = 0; for (let i = 0; i < 365; i++) { const d = new Date(Date.parse(k) + i * 864e5).toISOString().slice(0, 10); if ([...t.dailyList(d), ...t.hardList(d)].some((it) => it.t === "typhoon")) bad++; } return bad === 0 && t.ERAMP[0][0].indexOf("typhoon") < 0 && t.ERAMP[1][0].includes("typhoon") && t.ERAMP[2][0].includes("typhoon"); }));
       await pt.close();
     } catch (e) { check("台風の練習", false, e.message.split("\n")[0]); }
+    try { // 前線（練習・とことん・手引きだけ）
+      const pf = await newPage(); await pf.click("#howto-ok"); await pf.click("#go-p"); await pf.click("#go-guide");
+      check("手引きの前線は、通りすぎたあとの気温（温暖前線は上がる・寒冷前線は下がる）を書き、気象庁「予報用語（前線）」へのリンクがある", /温暖前線が通りすぎたあとはふつう気温が上がり、寒冷前線が通りすぎたあとは下がる/.test(await pf.textContent("#gd-front")) && (await pf.locator("a[href='https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi3.html']").count()) === 1);
+      await pf.click("#gd-front button");
+      check("前線の練習：5問とも前線・答えは2つ・地点に印", await pf.evaluate(() => window.__tk.load().runs.p.list.every((it) => it.t === "front")) && (await pf.locator("#ch button").count()) === 2 && (await pf.locator("#mp svg circle").count()) === 1);
+      for (let j = 0; j < 5; j++) { await ansNow(pf, j !== 0); if (j === 0) { const w = await pf.locator(".why").textContent(); check("前線をまちがえると、記号（三角・半円）と気温の説明が出る", /三角の記号は寒冷前線|半円の記号は温暖前線/.test(w), w); } await pf.click("#next"); }
+      check("前線の練習は今日の記録を増やさず、読めた数の「前線」に入る・とことんにも出る", await pf.evaluate(() => { const s = window.__tk.load(), t = window.__tk; return !Object.keys(s.days).length && (s.got.front || 0) >= 4 && t.ERAMP[1][0].includes("front") && t.ERAMP[2][0].includes("front"); }));
+      await pf.close();
+    } catch (e) { check("前線の練習", false, e.message.split("\n")[0]); }
     const pe = await newPage();
     await pe.waitForFunction(() => document.getElementById("howto").open); // 窓が開いてから Esc を押す（開く前に押すと何も起きない）
     await pe.keyboard.press("Escape");

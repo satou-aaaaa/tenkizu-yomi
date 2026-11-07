@@ -358,10 +358,10 @@ const dailyList = (k) => DAILY.map((t, i) => ({ seed: G.seedOf(k + ":d:" + i), t
 const hardList = (k) => HARDT.map((t, i) => ({ seed: G.seedOf(k + ":h:" + i), t, h: 1 }));
 const cache = new Map();
 const qOf = (it) => { const k = it.seed + ":" + it.t + ":" + it.h; if (!cache.has(k)) cache.set(k, G.makeQ(it.seed, it.t, !!it.h)); return cache.get(k); };
-const NAME = { season: "季節", strong: "風の強さ", wind: "風向き", weather: "天気", typhoon: "台風" };
-const BASE4 = ["season", "strong", "wind", "weather"]; // 今日の5問に出る4つの種類（台風は練習・とことん・手引きだけ）
-// とことん：やさしい5問（季節・風の強さ）→ ふつう15問（4つの種類と台風）→ むずかしい80問（8方位の風向き・風の強さ・天気・台風）。毎回ちがう種で次々に出す（乱数は練習ととことんだけ）
-const ELV = ["やさしい", "ふつう", "むずかしい"], ERAMP = [[["season", "strong"], 0, 5], [["season", "strong", "wind", "weather", "typhoon"], 0, 15], [["wind", "strong", "weather", "typhoon"], 1, 80]];
+const NAME = { season: "季節", strong: "風の強さ", wind: "風向き", weather: "天気", typhoon: "台風", front: "前線" };
+const BASE4 = ["season", "strong", "wind", "weather"]; // 今日の5問に出る4つの種類（台風・前線は練習・とことん・手引きだけ）
+// とことん：やさしい5問（季節・風の強さ）→ ふつう15問（4つの種類と台風・前線）→ むずかしい80問（8方位の風向き・風の強さ・天気・台風・前線）。毎回ちがう種で次々に出す（乱数は練習ととことんだけ）
+const ELV = ["やさしい", "ふつう", "むずかしい"], ERAMP = [[["season", "strong"], 0, 5], [["season", "strong", "wind", "weather", "typhoon", "front"], 0, 15], [["wind", "strong", "weather", "typhoon", "front"], 1, 80]];
 const eItem = (seen, ts, h, lv) => { let seed; do seed = Math.floor(Math.random() * 2 ** 31); while (seen.has(seed)); seen.add(seed); return { seed, t: ts[Math.floor(Math.random() * ts.length)], h, lv }; };
 function endlessList() { const out = [], seen = new Set(); ERAMP.forEach(([ts, h, n], lv) => { for (let j = 0; j < n; j++) out.push(eItem(seen, ts, h, lv)); }); return out; }
 // 並びの終わりが近づいたら、むずかしい問題を40問ずつ後ろに足して続ける（1回の中で同じ種は出さない。「ここで降りる」まで終わらない）
@@ -562,7 +562,7 @@ const GUIDE = [
   ["isobar", "等圧線", "strong", ["同じ気圧の所を結んだ線。4hPaごとに引き、20hPaごとに太くする。", "線の間がせまい所ほど気圧の差が大きく、風が強い。"]],
   ["hl", "高気圧と低気圧", "weather", ["「高」はまわりより気圧が高い所、「低」は低い所。", "高気圧の近くは晴れやすく、低気圧や前線の近くは雲が多く雨になりやすい。"]],
   ["wind", "風向き", "wind", ["風は気圧の高いほうから低いほうへ、等圧線をななめに横切って吹く。", "北半球では、高気圧から時計回りに吹き出し、低気圧へ反時計回りに吹き込む。", "風向きは吹いてくる方角で言う（北から吹く風が北風）。"]],
-  ["front", "前線", "weather", ["半円は温暖前線、三角は寒冷前線、半円と三角が交互なのは停滞前線。", "前線は暖かい空気と冷たい空気の境目で、近くでは雨が降りやすい。"]],
+  ["front", "前線", "front", ["半円は温暖前線、三角は寒冷前線、半円と三角が交互なのは停滞前線。", "前線は暖かい空気と冷たい空気の境目で、近くでは雨が降りやすい。", "温暖前線が通りすぎたあとはふつう気温が上がり、寒冷前線が通りすぎたあとは下がる。"]],
   ["season", "季節の形", "season", ["冬：西に高気圧・東に低気圧（西高東低）。等圧線が南北にせまく並び、日本海側は雪、太平洋側は晴れ。", "夏：南の太平洋高気圧が日本をおおう（南高北低）。", "梅雨：日本の南に停滞前線がのびる。春・秋：高気圧と低気圧が交互に西から東へ進む。"]],
   ["typhoon", "台風", "typhoon", ["台風は熱帯の海で生まれた低気圧のうち、風が特に強いもの。等圧線が丸く、せまく並ぶ。", "地上の近くでは、上から見て反時計回りに中心へ強い風が吹き込む。", "進む向きに向かって右側は、吹き込む風と台風の進む速さが重なって、風が強い。"]],
 ];
@@ -571,7 +571,7 @@ function guide(back) {
   app.innerHTML = `
     <header><button class="icon" id="back" aria-label="もどる">←</button><h1>読み方の手引き<small>6つの要点</small></h1><span></span></header>
     <div class="guide">${GUIDE.map(([id, name, t, lines]) => `<section class="gd" id="gd-${id}"><h2>${name}</h2><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><button class="sub" data-t="${t}">「${NAME[t]}」を練習する</button></section>`).join("")}</div>
-    <p class="note">出どころ：<a href="${GUIDE_SRC}" target="_blank" rel="noopener">気象庁「日本周辺域 実況天気図の説明」</a>・<a href="https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi1.html" target="_blank" rel="noopener">予報用語（気圧配置）</a>・<a href="https://www.jma.go.jp/jma/kishou/know/typhoon/2-1.html" target="_blank" rel="noopener">台風に伴う風の特性</a>。このゲームの天気図は練習用の架空のものです。</p>
+    <p class="note">出どころ：<a href="${GUIDE_SRC}" target="_blank" rel="noopener">気象庁「日本周辺域 実況天気図の説明」</a>・<a href="https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi1.html" target="_blank" rel="noopener">予報用語（気圧配置）</a>・<a href="https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi3.html" target="_blank" rel="noopener">予報用語（前線）</a>・<a href="https://www.jma.go.jp/jma/kishou/know/typhoon/2-1.html" target="_blank" rel="noopener">台風に伴う風の特性</a>。このゲームの天気図は練習用の架空のものです。</p>
     ${footer()}`;
   $("back").onclick = back || home;
   document.querySelectorAll(".gd button").forEach((b) => (b.onclick = () => startRun("p", b.dataset.t)));

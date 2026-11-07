@@ -81,6 +81,7 @@
   const shuffle = (R, a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(R() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; } return a; };
   function makeQ(seed, t, hard) {
     if (t === "typhoon") return makeTQ(seed);
+    if (t === "front") return makeFQ(seed);
     const R = rng(seed);
     for (let tries = 0; tries < 400; tries++) {
       const season = t === "season" ? pick(R, SEASON) : t === "weather" ? pick(R, ["冬", "梅雨", "梅雨", "春・秋", "春・秋", "夏"]) : pick(R, ["冬", "春・秋", "春・秋", "夏"]);
@@ -138,6 +139,20 @@
       if (dT > 180 || dT < 40 || w.speed < 0.05 || Math.abs(((w.deg + 22.5) % 45) - 22.5) > 15) continue; // 台風のそばで、向きがはっきりする所だけ
       const k = DIR8.indexOf(w.from), choices = shuffle(R, [w.from, ...[2, 4, 6].map((o) => DIR8[(k + o) % 8])]);
       return { t: "typhoon", map: m, ask: `台風のそばの${c[0]}では、どの方角から風が吹いてくる？`, choices, ans: w.from, why: "台風のまわりでは、上から見て反時計回りに、中心へ向かって強い風が吹き込みます。", pts: [c[0]], src: "jma-typhoon" };
+    }
+    return null;
+  }
+  // 前線の問題：印の地点のすぐ近くにある前線（寒冷前線か温暖前線の片方だけ）が通りすぎたあと、気温は上がるか下がるか
+  // 気象庁「予報用語（前線）」：温暖前線は通常、通過後に気温が上がる。寒冷前線は通常、通過後に気温が下がる
+  function makeFQ(seed) {
+    const R = rng(seed + 104729);
+    for (let tries = 0; tries < 600; tries++) {
+      const m = makeMap(R, "春・秋"), want = R() < 0.5 ? "cold" : "warm", other = want === "cold" ? "warm" : "cold";
+      const near = shuffle(R, CITY).find((c) => frontDist(m, c[1], c[2], want) < 40 && frontDist(m, c[1], c[2], other) > 90);
+      if (!near) continue;
+      const ans = want === "cold" ? "下がる" : "上がる";
+      return { t: "front", map: m, ask: `${near[0]}のすぐ近くの前線が、${near[0]}を通りすぎたあと、気温はどうなりやすい？`, choices: ["上がる", "下がる"], ans, fk: want,
+        why: want === "cold" ? "三角の記号は寒冷前線。暖かい空気の側へ進む前線で、通りすぎたあとはふつう気温が下がります。" : "半円の記号は温暖前線。冷たい空気の側へ進む前線で、通りすぎたあとはふつう気温が上がります。", pts: [near[0]] };
     }
     return null;
   }

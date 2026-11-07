@@ -426,12 +426,13 @@ try {
   try { // スマホで初めて遊ぶ人の使いやすさ（2026-11-07 UI/UX の見直し）
     for (const [w, h] of [[390, 844], [320, 640]]) {
       const pu = await newPage(w, h); await pu.click("#howto-ok");
-      const oneLine = (sel) => pu.evaluate((sel) => [...document.querySelectorAll(sel)].filter((b) => b.getBoundingClientRect().height > 60).map((b) => b.textContent.trim()), sel);
+      // ボタンの中の字（文字の節ごと）が何行に並んだかを、Range の行の上端の数で数える（高さで見ると、字が大きいだけでも折れたと見誤る）
+      const oneLine = (sel) => pu.evaluate((sel) => [...document.querySelectorAll(sel)].filter((b) => { const tw = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); let n; while ((n = tw.nextNode())) { if (!n.textContent.trim()) continue; const rg = document.createRange(); rg.selectNodeContents(n); if (new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size > 1) return true; } return false; }).map((b) => b.textContent.trim()), sel);
       const home0 = await pu.evaluate(() => { const r = document.querySelector("#go-d").getBoundingClientRect(); return { inView: r.top >= 0 && r.bottom <= innerHeight, stats: !!document.querySelector(".stats"), ovf: document.documentElement.scrollWidth - innerWidth }; });
       check(`${w}px：はじめて開いたホームは「今日の5問」が1画面目に収まり、0 ばかりの記録を出さない・横にはみ出さない`, home0.inView && !home0.stats && home0.ovf <= 0, JSON.stringify(home0));
       const wrapH = await oneLine("button.main");
       check(`${w}px：ホームの大きなボタンの字が2行に折れない`, wrapH.length === 0, wrapH.join(" / "));
-      check(`${w}px：ホームの説明は言葉の途中で折れない（句ごとに折り返す）`, await pu.evaluate(() => [...document.querySelectorAll(".lead .nw")].every((e) => e.getClientRects().length === 1)));
+      check(`${w}px：ホームの説明は言葉の途中で折れない（句ごとに折り返す）`, await pu.evaluate(() => { const nw = [...document.querySelectorAll(".lead .nw")]; return nw.length > 0 && nw.every((e) => { const rg = document.createRange(); rg.selectNodeContents(e); return new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size === 1; }); }));
       await pu.click("#go-d");
       await ansNow(pu, false);
       check(`${w}px：まちがえると、答え合わせの枠が朱の破線と ✕ になる`, await pu.evaluate(() => { const v = document.querySelector(".verdict"); return v.classList.contains("ng") && v.querySelector(".vm").textContent === "✕" && getComputedStyle(v).borderTopStyle === "dashed"; }));

@@ -334,7 +334,7 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
   </ol>
   <p>前線：赤い半円は温暖前線、青い三角は寒冷前線、赤と青が交互なのは停滞前線。天気図は練習用に作った架空のものです（本物の予報ではありません）。</p>
   <p>今日の5問はだれでも同じで1日1回。上級もはじめから遊べます。練習と「とことん」は何度でも、まちがえても続けられます。時間制限はありません。</p>
-  <p><a href="#" id="howto-guide">読み方の手引き（等圧線・風・前線・季節の要点）</a></p>
+  <p><a href="#" id="howto-guide">読み方の手引き（等圧線・風・前線・季節・台風の要点）</a></p>
   <p><a href="#" data-a11y-open>見やすさの設定（文字・色・動き・読み上げ）</a>　<a id="fb2" target="_blank" rel="noopener">感想を送る</a></p>
   <button class="main" id="howto-ok" style="width:100%">わかった</button>
 </dialog>
@@ -358,9 +358,10 @@ const dailyList = (k) => DAILY.map((t, i) => ({ seed: G.seedOf(k + ":d:" + i), t
 const hardList = (k) => HARDT.map((t, i) => ({ seed: G.seedOf(k + ":h:" + i), t, h: 1 }));
 const cache = new Map();
 const qOf = (it) => { const k = it.seed + ":" + it.t + ":" + it.h; if (!cache.has(k)) cache.set(k, G.makeQ(it.seed, it.t, !!it.h)); return cache.get(k); };
-const NAME = { season: "季節", strong: "風の強さ", wind: "風向き", weather: "天気" };
-// とことん：やさしい5問（季節・風の強さ）→ ふつう15問（4つの種類）→ むずかしい80問（8方位の風向き・風の強さ・天気）。毎回ちがう種で次々に出す（乱数は練習ととことんだけ）
-const ELV = ["やさしい", "ふつう", "むずかしい"], ERAMP = [[["season", "strong"], 0, 5], [["season", "strong", "wind", "weather"], 0, 15], [["wind", "strong", "weather"], 1, 80]];
+const NAME = { season: "季節", strong: "風の強さ", wind: "風向き", weather: "天気", typhoon: "台風" };
+const BASE4 = ["season", "strong", "wind", "weather"]; // 今日の5問に出る4つの種類（台風は練習・とことん・手引きだけ）
+// とことん：やさしい5問（季節・風の強さ）→ ふつう15問（4つの種類と台風）→ むずかしい80問（8方位の風向き・風の強さ・天気・台風）。毎回ちがう種で次々に出す（乱数は練習ととことんだけ）
+const ELV = ["やさしい", "ふつう", "むずかしい"], ERAMP = [[["season", "strong"], 0, 5], [["season", "strong", "wind", "weather", "typhoon"], 0, 15], [["wind", "strong", "weather", "typhoon"], 1, 80]];
 const eItem = (seen, ts, h, lv) => { let seed; do seed = Math.floor(Math.random() * 2 ** 31); while (seen.has(seed)); seen.add(seed); return { seed, t: ts[Math.floor(Math.random() * ts.length)], h, lv }; };
 function endlessList() { const out = [], seen = new Set(); ERAMP.forEach(([ts, h, n], lv) => { for (let j = 0; j < n; j++) out.push(eItem(seen, ts, h, lv)); }); return out; }
 // 並びの終わりが近づいたら、むずかしい問題を40問ずつ後ろに足して続ける（1回の中で同じ種は出さない。「ここで降りる」まで終わらない）
@@ -407,7 +408,7 @@ const allOk = (rec) => !!rec && Array.isArray(rec.r) && rec.r.length > 0 && nOk(
 function tally(s) {
   const dv = Object.values(s.days || {}), hv = Object.values(s.hdays || {}), g = s.got || {};
   return { days: Object.keys(s.days || {}).length, perfect: dv.filter(allOk).length, hard: hv.length, hardP: hv.filter(allOk).length, late: Object.keys(s.adays || {}).length,
-    ok: s.ok || 0, rv: s.rv || 0, wind: g.wind || 0, weather: g.weather || 0, every: Math.min(...Object.keys(NAME).map((t) => g[t] || 0)) };
+    ok: s.ok || 0, rv: s.rv || 0, wind: g.wind || 0, weather: g.weather || 0, every: Math.min(...BASE4.map((t) => g[t] || 0)) };
 }
 const ACH = [
   ["perfect1", "快晴の日", "今日の5問を全問正解", 0, "perfect", 1],
@@ -482,21 +483,29 @@ function frontSvg(f) {
 }
 // 読み上げ用の天気図の名前：高気圧・低気圧・前線の数と、印を付けた地点（答えは言わない）
 const FN = { cold: "寒冷前線", warm: "温暖前線", stay: "停滞前線" };
-function mapLabel(q) { const m = q.map, H = m.centers.filter((c) => c.k === "H").length, L = m.centers.length - H, fr = [...new Set(m.fronts.map((f) => FN[f.k]))]; return `天気図：高気圧${H}つ・低気圧${L}つ${fr.length ? "・" + fr.join("・") : ""}${(q.pts || []).length ? `。印の地点：${q.pts.join("・")}` : ""}`; }
+function mapLabel(q) { const m = q.map, H = m.centers.filter((c) => c.k === "H").length, T = m.centers.filter((c) => c.k === "T").length, L = m.centers.length - H - T, fr = [...new Set(m.fronts.map((f) => FN[f.k]))]; return `天気図：高気圧${H}つ・${T ? `台風${T}つ（矢印の向きに進む）` : `低気圧${L}つ`}${fr.length ? "・" + fr.join("・") : ""}${(q.pts || []).length ? `。印の地点：${q.pts.join("・")}` : ""}`; }
 let LAND = null;
+const CK = { H: "高", L: "低", T: "台" };
+// 台風の進む向き：中心から太い点線の矢印（気象庁の天気図の予報円の代わりに、向きだけを示す）
+function trackSvg(m) {
+  const T = m.centers.find((c) => c.k === "T"); if (!T || !m.tr) return "";
+  const L = 110, x0 = T.x + m.tr.dx * 34, y0 = T.y + m.tr.dy * 34, x1 = T.x + m.tr.dx * L, y1 = T.y + m.tr.dy * L, h = 16, px = -m.tr.dy * h * 0.6, py = m.tr.dx * h * 0.6, f = (v) => v.toFixed(1);
+  const d = `M${f(x0)},${f(y0)}L${f(x1)},${f(y1)}`, head = `M${f(x1 - m.tr.dx * h + px)},${f(y1 - m.tr.dy * h + py)}L${f(x1)},${f(y1)}L${f(x1 - m.tr.dx * h - px)},${f(y1 - m.tr.dy * h - py)}`;
+  return `<g class="trk"><path d="${d}${head}" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" fill="none" stroke="#7a2bb8" stroke-width="6" stroke-dasharray="12 8" stroke-linecap="round"/><path d="${head}" fill="none" stroke="#7a2bb8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+}
 function mapHtml(q) {
   const m = q.map;
   if (!LAND) LAND = M.P.map((p) => `<path d="${p[1]}"/>`).join("");
-  const centers = m.centers.filter((c) => c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH).map((c) => `<text x="${c.x}" y="${c.y}" font-size="46" class="c${c.k}" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text><text x="${c.x}" y="${c.y + 38}" font-size="24" fill="#26323a" text-anchor="middle">${c.p}</text>`).join("");
-  const edge = m.centers.filter((c) => !(c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH)).map((c) => { const x = Math.max(X0 + 30, Math.min(X0 + VW - 30, c.x)), y = Math.max(Y0 + 30, Math.min(Y0 + VH - 30, c.y)); return `<text x="${x}" y="${y}" font-size="42" class="c${c.k}" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.k === "H" ? "高" : "低"}</text>`; }).join("");
+  const centers = m.centers.filter((c) => c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH).map((c) => `<text x="${c.x}" y="${c.y}" font-size="46" class="c${c.k === "T" ? "L" : c.k}" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${CK[c.k]}</text><text x="${c.x}" y="${c.y + 38}" font-size="24" fill="#26323a" text-anchor="middle">${c.p}</text>`).join("");
+  const edge = m.centers.filter((c) => !(c.x > X0 && c.x < X0 + VW && c.y > Y0 && c.y < Y0 + VH)).map((c) => { const x = Math.max(X0 + 30, Math.min(X0 + VW - 30, c.x)), y = Math.max(Y0 + 30, Math.min(Y0 + VH - 30, c.y)); return `<text x="${x}" y="${y}" font-size="42" class="c${c.k === "T" ? "L" : c.k}" fill="${c.k === "H" ? "#2f6fd0" : "#d2492f"}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${CK[c.k]}</text>`; }).join("");
   const pts = (q.pts || []).map((n, i) => { const c = G.city(n); return `<circle cx="${c[1]}" cy="${c[2]}" r="11" fill="#ffd36b" stroke="#26323a" stroke-width="3"/><text x="${c[1] + 14}" y="${c[2] - 12}" font-size="32" font-weight="800" fill="#26323a" paint-order="stroke" stroke="#fff" stroke-width="5">${n}</text>`; }).join("");
-  return `<svg viewBox="${X0} ${Y0} ${VW} ${VH}" role="img" aria-label="${mapLabel(q)}"><rect x="${X0}" y="${Y0}" width="${VW}" height="${VH}" fill="#dce9f3"/><g fill="#eadfbf" stroke="#eadfbf" stroke-width="1.5">${LAND}</g>${isobars(m)}${m.fronts.map(frontSvg).join("")}${centers}${edge}${pts}<text x="${X0 + VW - 14}" y="${Y0 + 30}" font-size="26" text-anchor="end" fill="#5b6f80">↑北</text></svg>`;
+  return `<svg viewBox="${X0} ${Y0} ${VW} ${VH}" role="img" aria-label="${mapLabel(q)}"><rect x="${X0}" y="${Y0}" width="${VW}" height="${VH}" fill="#dce9f3"/><g fill="#eadfbf" stroke="#eadfbf" stroke-width="1.5">${LAND}</g>${isobars(m)}${m.fronts.map(frontSvg).join("")}${trackSvg(m)}${centers}${edge}${pts}<text x="${X0 + VW - 14}" y="${Y0 + 30}" font-size="26" text-anchor="end" fill="#5b6f80">↑北</text></svg>`;
 }
 // 答えたあとに重ねる絵：天気図じゅうの風の矢印（高気圧から吹き出し、低気圧へ吹き込む流れ）と、聞いた地点の太い矢印・天気の印。
 // 矢印は gen.js の wind（答えと同じ計算）から描く。長さは風の強さ。答える前には出さない（答えを言わない）
 const WX = { 晴れ: "☀", 雨: "☂", 雪: "❄" };
 // 説明：その問題の地点に合わせて一言足す（風の強さは2地点の比べ、風向きは地図の矢印を見てもらう）
-const whyOf = (q) => q.t === "strong" ? `${q.ans}のほうが等圧線の間がせまい。${q.why}` : q.t === "wind" ? `${q.why}地図の赤い矢印が${q.pts[0]}の風です。` : q.why;
+const whyOf = (q) => q.t === "typhoon" ? (q.pts.length === 2 ? `${q.ans}は台風の進む向きの右側。${q.why}` : `${q.why}地図の赤い矢印が${q.pts[0]}の風です。`) : q.t === "strong" ? `${q.ans}のほうが等圧線の間がせまい。${q.why}` : q.t === "wind" ? `${q.why}地図の赤い矢印が${q.pts[0]}の風です。` : q.why;
 function windLayer(q) {
   const m = q.map, f = (v) => v.toFixed(1), pts = (q.pts || []).map((n) => G.city(n)).filter(Boolean);
   const arrow = (x, y, w, big) => {
@@ -510,7 +519,7 @@ function windLayer(q) {
     const w = G.wind(m, x, y); if (w.speed < 0.006) continue;
     small += arrow(x, y, w, false);
   }
-  const big = pts.map((c) => arrow(c[1], c[2], G.wind(m, c[1], c[2]), true)).join("");
+  const big = pts.map((c) => { const w = G.wind(m, c[1], c[2]); return arrow(c[1], c[2], m.tr ? { ...w, speed: G.windT(m, c[1], c[2]) } : w, true); }).join(""); // 台風は進む速さを足した強さで長さを決める
   const wx = q.t === "weather" && WX[q.ans] && pts[0] ? `<text x="${pts[0][1] - 34}" y="${pts[0][2] + 46}" font-size="46" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="6">${WX[q.ans]}</text>` : "";
   return `<g class="wl" id="wl"><path d="${small}" fill="none" stroke="#2f5d7a" stroke-opacity=".5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>${big ? `<path d="${big}" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/><path class="wb" d="${big}" fill="none" stroke="#d2492f" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>` : ""}${wx}</g>`;
 }
@@ -555,13 +564,14 @@ const GUIDE = [
   ["wind", "風向き", "wind", ["風は気圧の高いほうから低いほうへ、等圧線をななめに横切って吹く。", "北半球では、高気圧から時計回りに吹き出し、低気圧へ反時計回りに吹き込む。", "風向きは吹いてくる方角で言う（北から吹く風が北風）。"]],
   ["front", "前線", "weather", ["半円は温暖前線、三角は寒冷前線、半円と三角が交互なのは停滞前線。", "前線は暖かい空気と冷たい空気の境目で、近くでは雨が降りやすい。"]],
   ["season", "季節の形", "season", ["冬：西に高気圧・東に低気圧（西高東低）。等圧線が南北にせまく並び、日本海側は雪、太平洋側は晴れ。", "夏：南の太平洋高気圧が日本をおおう（南高北低）。", "梅雨：日本の南に停滞前線がのびる。春・秋：高気圧と低気圧が交互に西から東へ進む。"]],
+  ["typhoon", "台風", "typhoon", ["台風は熱帯の海で生まれた低気圧のうち、風が特に強いもの。等圧線が丸く、せまく並ぶ。", "地上の近くでは、上から見て反時計回りに中心へ強い風が吹き込む。", "進む向きに向かって右側は、吹き込む風と台風の進む速さが重なって、風が強い。"]],
 ];
 const GUIDE_SRC = "https://www.jma.go.jp/jma/kishou/know/kurashi/sokuhou_kaisetu.html";
 function guide(back) {
   app.innerHTML = `
-    <header><button class="icon" id="back" aria-label="もどる">←</button><h1>読み方の手引き<small>5つの要点</small></h1><span></span></header>
+    <header><button class="icon" id="back" aria-label="もどる">←</button><h1>読み方の手引き<small>6つの要点</small></h1><span></span></header>
     <div class="guide">${GUIDE.map(([id, name, t, lines]) => `<section class="gd" id="gd-${id}"><h2>${name}</h2><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><button class="sub" data-t="${t}">「${NAME[t]}」を練習する</button></section>`).join("")}</div>
-    <p class="note">出どころ：<a href="${GUIDE_SRC}" target="_blank" rel="noopener">気象庁「日本周辺域 実況天気図の説明」</a>・<a href="https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi1.html" target="_blank" rel="noopener">予報用語（気圧配置）</a>。このゲームの天気図は練習用の架空のものです。</p>
+    <p class="note">出どころ：<a href="${GUIDE_SRC}" target="_blank" rel="noopener">気象庁「日本周辺域 実況天気図の説明」</a>・<a href="https://www.jma.go.jp/jma/kishou/know/yougo_hp/haichi1.html" target="_blank" rel="noopener">予報用語（気圧配置）</a>・<a href="https://www.jma.go.jp/jma/kishou/know/typhoon/2-1.html" target="_blank" rel="noopener">台風に伴う風の特性</a>。このゲームの天気図は練習用の架空のものです。</p>
     ${footer()}`;
   $("back").onclick = back || home;
   document.querySelectorAll(".gd button").forEach((b) => (b.onclick = () => startRun("p", b.dataset.t)));
@@ -570,7 +580,7 @@ function guide(back) {
 function practiceMenu() {
   app.innerHTML = `<header><button class="icon" id="back" aria-label="もどる">←</button><h1>練習<small>今日の記録には入りません（読めた数には入ります）</small></h1><span></span></header>
     <p class="note">問題の種類を選ぶと、5問出ます。</p>
-    <button class="sub" id="go-guide" style="width:100%">📘 読み方の手引き（5つの要点）</button>
+    <button class="sub" id="go-guide" style="width:100%">📘 読み方の手引き（6つの要点）</button>
     <div class="lv">${Object.keys(NAME).map((t) => `<button class="sub" data-t="${t}" style="min-height:64px">${NAME[t]}</button>`).join("")}</div>${footer()}`;
   $("back").onclick = home;
   $("go-guide").onclick = () => guide(practiceMenu);
@@ -743,7 +753,7 @@ function dex() {
     <header><button class="icon" id="back" aria-label="ホームへ">←</button><h1>読めた数<small>正解 ${s.ok}問</small></h1><span></span></header>
     <p class="note">問題の種類ごとの正解の数です。</p>
     <div class="res">${Object.keys(NAME).map((t) => `<div><span>${NAME[t]}</span><b>${s.got[t] || 0}問</b></div>`).join("")}</div>
-    <button class="sub" id="go-guide" style="width:100%">📘 読み方の手引き（5つの要点）</button>
+    <button class="sub" id="go-guide" style="width:100%">📘 読み方の手引き（6つの要点）</button>
     ${footer()}`;
   $("back").onclick = home;
   $("go-guide").onclick = () => guide(dex);

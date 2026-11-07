@@ -47,6 +47,23 @@
     m.centers.forEach((c) => (c.p = Math.round(pressure(m, c.x, c.y))));
     return m;
   }
+  // 台風の天気図（今日の5問・上級には出さない。練習・とことんだけ。過去の日の問題は変わらない）
+  // 台風は等圧線が丸くこみ合った低気圧。進む向き（tr）を持つ。東に太平洋高気圧
+  function makeTyphoon(R, x, y, hx, hy) {
+    const j = (a) => (R() - 0.5) * 2 * a, m = { season: "台風", centers: [], fronts: [] };
+    m.centers.push({ k: "H", x: 760 + j(60), y: 420 + j(120), a: 12 + j(3), s: 260 }, { k: "T", x, y, a: -48 + j(8), s: 70 });
+    m.tr = { dx: hx, dy: hy };
+    m.centers.forEach((c) => (c.p = Math.round(pressure(m, c.x, c.y))));
+    return m;
+  }
+  // 台風が進むときの風：台風をまわる風（wind）に、台風の進む速さを足す。進む向きの右側は2つが重なって強い（気象庁「台風に伴う風の特性」）
+  const TSPD = 0.05;
+  function windT(m, x, y) {
+    const w = wind(m, x, y); if (!m.tr || !w.from) return w.speed;
+    const r = w.deg * Math.PI / 180, vx = -Math.sin(r) * w.speed + m.tr.dx * TSPD, vy = Math.cos(r) * w.speed + m.tr.dy * TSPD; // 吹いていく向き（画面の座標）
+    return Math.hypot(vx, vy);
+  }
+  const rightOf = (m, c, px, py) => m.tr.dx * (py - c.y) - m.tr.dy * (px - c.x) > 0; // 進む向きの右側か（画面は y が下向き）
   // 地点の天気（はっきり言える所だけ。言えなければ null）
   function weather(m, n) {
     const [, x, y] = city(n), near = (k, r) => m.centers.some((c) => c.k === k && Math.hypot(c.x - x, c.y - y) < r);
@@ -63,6 +80,7 @@
   const pick = (R, a) => a[Math.floor(R() * a.length)];
   const shuffle = (R, a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const k = Math.floor(R() * (i + 1)); [a[i], a[k]] = [a[k], a[i]]; } return a; };
   function makeQ(seed, t, hard) {
+    if (t === "typhoon") return makeTQ(seed);
     const R = rng(seed);
     for (let tries = 0; tries < 400; tries++) {
       const season = t === "season" ? pick(R, SEASON) : t === "weather" ? pick(R, ["冬", "梅雨", "梅雨", "春・秋", "春・秋", "夏"]) : pick(R, ["冬", "春・秋", "春・秋", "夏"]);
@@ -97,6 +115,32 @@
     }
     return null;
   }
-  const B = { rng, seedOf, M, CITY, city, SEA_J, SEA_P, DIR8, SEASON, pressure, grad, wind, weather, frontDist, makeMap, makeQ };
+  // 台風の問題：進む向きの右と左で風の強さを比べる（7割）か、台風のそばの風向き（3割）
+  function makeTQ(seed) {
+    const R = rng(seed + 7919);
+    for (let tries = 0; tries < 600; tries++) {
+      const [a, b] = shuffle(R, CITY).slice(0, 2), d = Math.hypot(a[1] - b[1], a[2] - b[2]);
+      if (d < 110 || d > 260) continue;
+      const mx = (a[1] + b[1]) / 2, my = (a[2] + b[2]) / 2;
+      let nx = -(b[2] - a[2]) / d, ny = (b[1] - a[1]) / d; if (ny < 0) { nx = -nx; ny = -ny; } // 2地点を結ぶ線に直角で、南（画面の下）向き
+      const off = 60 + R() * 70, x = mx + nx * off, y = my + ny * off, hx = -nx, hy = -ny; // 台風は南から2地点のあいだへ向かって進む
+      if (hy > -0.5 || x < -30 || x > 680 || y < 20 || y > 610) continue; // 北西〜北東へ進むものだけ・地図の中
+      const m = makeTyphoon(R, x, y, hx, hy), T = m.centers[1];
+      if (R() < 0.7) {
+        const sa = windT(m, a[1], a[2]), sb = windT(m, b[1], b[2]);
+        if (Math.min(sa, sb) < 0.04 || Math.max(sa, sb) < Math.min(sa, sb) * 1.3) continue; // 差がはっきりしない所は出さない
+        const hi = sa > sb ? a : b;
+        if (!rightOf(m, T, hi[1], hi[2])) continue; // 計算どおり右側が強いものだけ（説明と合わせる）
+        const ch = shuffle(R, [a[0], b[0]]);
+        return { t: "typhoon", map: m, ask: `台風が矢印の向きに進む。風がより強くなりやすいのは、${ch[0]}と${ch[1]}のどちら？`, choices: ch, ans: hi[0], why: "台風の進む向きに向かって右側は、台風に吹き込む風と台風の進む速さが重なり、風が強くなります。", pts: ch, src: "jma-typhoon" };
+      }
+      const c = pick(R, CITY), w = wind(m, c[1], c[2]), dT = Math.hypot(c[1] - T.x, c[2] - T.y);
+      if (dT > 180 || dT < 40 || w.speed < 0.05 || Math.abs(((w.deg + 22.5) % 45) - 22.5) > 15) continue; // 台風のそばで、向きがはっきりする所だけ
+      const k = DIR8.indexOf(w.from), choices = shuffle(R, [w.from, ...[2, 4, 6].map((o) => DIR8[(k + o) % 8])]);
+      return { t: "typhoon", map: m, ask: `台風のそばの${c[0]}では、どの方角から風が吹いてくる？`, choices, ans: w.from, why: "台風のまわりでは、上から見て反時計回りに、中心へ向かって強い風が吹き込みます。", pts: [c[0]], src: "jma-typhoon" };
+    }
+    return null;
+  }
+  const B = { rng, seedOf, M, CITY, city, SEA_J, SEA_P, DIR8, SEASON, pressure, grad, wind, weather, frontDist, makeMap, makeQ, makeTyphoon, windT, rightOf, TSPD };
   if (typeof module !== "undefined") module.exports = B; else root.TKG = B;
 })(this);

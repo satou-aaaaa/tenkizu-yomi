@@ -453,6 +453,33 @@ try {
     check("まちがえた問題は30問まで（古いものから消し、今日の分は残す）", m2.n === m2.max && m2.mine, JSON.stringify(m2));
     await pr.close();
   } catch (e) { check("復習", false, e.message.split("\n")[0]); }
+  try { // スマホで初めて遊ぶ人の使いやすさ（2026-11-07 UI/UX の見直し）
+    for (const [w, h] of [[390, 844], [320, 640]]) {
+      const pu = await newPage(w, h); await pu.click("#howto-ok");
+      // ボタンの中の字（文字の節ごと）が何行に並んだかを、Range の行の上端の数で数える（高さで見ると、字が大きいだけでも折れたと見誤る）
+      const oneLine = (sel) => pu.evaluate((sel) => [...document.querySelectorAll(sel)].filter((b) => { const tw = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); let n; while ((n = tw.nextNode())) { if (!n.textContent.trim()) continue; const rg = document.createRange(); rg.selectNodeContents(n); if (new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size > 1) return true; } return false; }).map((b) => b.textContent.trim()), sel);
+      const home0 = await pu.evaluate(() => { const r = document.querySelector("#go-d").getBoundingClientRect(); return { inView: r.top >= 0 && r.bottom <= innerHeight, stats: !!document.querySelector(".stats"), ovf: document.documentElement.scrollWidth - innerWidth }; });
+      check(`${w}px：はじめて開いたホームは「今日の5問」が1画面目に収まり、0 ばかりの記録を出さない・横にはみ出さない`, home0.inView && !home0.stats && home0.ovf <= 0, JSON.stringify(home0));
+      const wrapH = await oneLine("button.main");
+      check(`${w}px：ホームの大きなボタンの字が2行に折れない`, wrapH.length === 0, wrapH.join(" / "));
+      check(`${w}px：ホームの説明は言葉の途中で折れない（句ごとに折り返す）`, await pu.evaluate(() => { const nw = [...document.querySelectorAll(".lead .nw")]; return nw.length > 0 && nw.every((e) => { const rg = document.createRange(); rg.selectNodeContents(e); return new Set([...rg.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top))).size === 1; }); }));
+      await pu.click("#go-d");
+      await ansNow(pu, false);
+      check(`${w}px：まちがえると、答え合わせの枠が朱の破線と ✕ になる`, await pu.evaluate(() => { const v = document.querySelector(".verdict"); return v.classList.contains("ng") && v.querySelector(".vm").textContent === "✕" && getComputedStyle(v).borderTopStyle === "dashed"; }));
+      check(`${w}px：答えたあと「次の問題へ」が画面の中に見える`, await pu.waitForFunction(() => { const r = document.querySelector("#next").getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }, null, { timeout: 3000 }).then(() => true, () => false));
+      await pu.click("#next"); await ansNow(pu, true);
+      check(`${w}px：正解すると、答え合わせの枠が緑の縁と ✓ になる`, await pu.evaluate(() => { const v = document.querySelector(".verdict"); return v.classList.contains("ok") && v.querySelector(".vm").textContent === "✓"; }));
+      for (let j = 0; j < 3; j++) { await pu.click("#next"); await ansNow(pu, true); }
+      await pu.click("#next");
+      const rs = await pu.evaluate(() => { const e = document.querySelector("#go-e"), r = document.querySelector(".res"); return { before: !!(e && r && (e.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING)), marks: [...document.querySelectorAll(".res .rm")].map((m) => m.getAttribute("aria-label") + m.textContent).join(","), ngRow: document.querySelectorAll(".res div.ng").length, ovf: document.documentElement.scrollWidth - innerWidth }; });
+      check(`${w}px：結果は「続けて遊ぶ：とことん」をふりかえりの前に置き、ふりかえりは ✓・✕ の印（読み上げの名前つき）`, rs.before && rs.marks === "まちがい✕,正解✓,正解✓,正解✓,正解✓" && rs.ngRow === 1 && rs.ovf <= 0, JSON.stringify(rs));
+      const wrapR = await oneLine("button.main");
+      check(`${w}px：結果の大きなボタンの字が2行に折れない`, wrapR.length === 0, wrapR.join(" / "));
+      await pu.click("#go-e"); await ansNow(pu, false);
+      check(`${w}px：とことんで答えたあとは、同じ知らせを2回出さない（下の「まちがえても続けられます」を隠す）`, await pu.locator("#enote").isHidden() && await pu.locator("#etk").isVisible());
+      await pu.close();
+    }
+  } catch (e) { check("スマホで初めて遊ぶ人の使いやすさ", false, e.message.split("\n")[0]); }
   try { // 引き継ぎコード（別の端末へ記録を移す。shared-workflows template/qa/transfer-check.mjs）
     await checkTransfer({ browser, url, game: "tenkizu-yomi", sample: { "tenkizu-v1": JSON.stringify({ v: 1, tut: true }) }, check, open: async (p) => { await p.click("#howto-ok", { timeout: 1500 }).catch(() => {}); } });
   } catch (e) { check("引き継ぎコード", false, e.message.split("\n")[0]); }

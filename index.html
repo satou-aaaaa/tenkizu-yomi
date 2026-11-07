@@ -73,7 +73,12 @@ button.sub:disabled{opacity:.4;cursor:default}
 .status{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;color:var(--ink2);min-height:22px}
 .verdict{background:var(--paper);border:2px solid #2f5d7a;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 0 #26323a1c;animation:up .35s ease-out}
 @keyframes up{from{transform:translateY(16px);opacity:0}to{transform:none;opacity:1}}
-.verdict .hd{display:flex;justify-content:center;align-items:baseline;gap:10px;font-size:22px;font-weight:800}
+.verdict .hd{display:flex;justify-content:center;align-items:center;gap:10px;font-size:22px;font-weight:800}
+/* 答えた瞬間の手ごたえ：正解は緑の縁と ✓、まちがいは朱の破線と ✕（色だけで分けない） */
+.verdict .vm{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:20px;color:#fff;flex:none}
+.verdict.ok{border-color:var(--go)}.verdict.ok .vm{background:#1f6b45}
+.verdict.ng{border-color:var(--route);border-style:dashed}.verdict.ng .vm{background:var(--route2)}
+.nw{display:inline-block}
 .stars{color:var(--gold);letter-spacing:.1em;font-size:20px}
 .stars .off{color:#26323a26}
 /* ホーム */
@@ -90,6 +95,10 @@ button.sub:disabled{opacity:.4;cursor:default}
 .big{font-weight:800;font-size:24px;text-align:center;margin:0}
 .res{display:flex;flex-direction:column;gap:6px}
 .res div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px}
+.res div.ng{border:1.5px dashed var(--route)}
+.res .rm{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;font-size:16px;font-weight:800;color:#fff;background:#1f6b45}
+.res .ng .rm{background:var(--route2)}
+.rh{font-size:13px;color:var(--ink2);margin:6px 0 -4px;font-weight:800;letter-spacing:.1em;text-align:center}
 .lv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 /* 県帳 */
 .dex{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
@@ -152,6 +161,8 @@ html.a11y-cvd .dots i.done{background:#0072B2}html.a11y-cvd .dots i.miss{box-sha
 html.a11y-cvd .fc{fill:#0072B2}html.a11y-cvd .fw{fill:#D55E00}html.a11y-cvd .fl-cold{stroke:#0072B2}html.a11y-cvd .fl-warm{stroke:#D55E00}html.a11y-cvd .fl-stay{stroke:#7a4f9e}
 html.a11y-cvd .cH{fill:#0072B2}html.a11y-cvd .cL{fill:#D55E00}
 html.a11y-cvd .wb{stroke:#D55E00}
+html.a11y-cvd .verdict.ok{border-color:#0072B2}html.a11y-cvd .verdict.ok .vm,html.a11y-cvd .res .rm{background:#00507e}
+html.a11y-cvd .verdict.ng{border-color:#D55E00}html.a11y-cvd .verdict.ng .vm,html.a11y-cvd .res .ng .rm{background:#9a3d00}html.a11y-cvd .res div.ng{border-color:#D55E00}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* all:unset のボタン（カレンダーのます目など）でも枠が消えないよう、いちばん最後に強く書く（2026-11-04 CodeRabbit） */
 :is(.icon,button,a):focus-visible{outline:2px solid var(--route)!important;outline-offset:2px}
@@ -502,19 +513,20 @@ function home() {
   const nr = nextRank(s.ok), late = lateDays(s, k), ag = achGot(s).length;
   const rd = s.runs.d && s.runs.d.date === k ? s.runs.d : null, rh = s.runs.h && s.runs.h.date === k ? s.runs.h : null;
   const sample = { map: G.makeMap(G.rng(3), "冬"), pts: [] };
+  const newbie = !s.ok && !Object.keys(s.days).length && !Object.keys(s.hdays).length; // はじめての人には 0 ばかりの記録を出さない（最初に押すボタンを目立たせる）
   app.innerHTML = `
     <h1 class="title">天気図よみ</h1>
     <div class="map" aria-hidden="true">${mapHtml(sample)}</div>
-    <p class="lead" data-a11y-say>等圧線・高気圧・前線から、風と天気を読む。<br>だれでも同じ1日5問。</p>
+    <p class="lead" data-a11y-say><span class="nw">等圧線・高気圧・前線から、</span><span class="nw">風と天気を読む。</span><br>だれでも同じ1日5問。</p>
     ${done ? `<div class="share">今日の結果　${done.r.map(sq).join("")} ${nOk(done)}/${done.r.length}</div>` : ""}
     <button class="main" id="go-d">${done ? "今日の結果を見る" : rd ? `続きから（${rd.res.length + 1}問目）` : `今日の5問を読む <small>#${dayNo(k)}</small>`}</button>
-    <button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：8方位の風向きと天気の5問"}</button>
+    <button class="main alt" id="go-h">${hdone ? "上級の結果を見る" : rh ? "上級の続きから" : "上級：8方位の風向きと天気"}</button>
     ${(() => { const re = s.runs.e && !doneOf(s.runs.e) ? s.runs.e : null; return `<button class="main alt" id="go-e">${re ? `とことんの続きから（${re.res.length + 1}問目）` : "とことん：何問続けて読める？"}${s.ebest ? ` <small>自己ベスト ${s.ebest}問</small>` : ""}</button>`; })()}
     <div class="row"><button class="sub" id="go-p">練習（何度でも）</button><button class="sub" id="go-dex">読めた数 ${s.ok}</button></div>
     ${(() => { const rr = s.runs.r && !doneOf(s.runs.r) ? s.runs.r : null, n = dueMiss(s, k).length; return rr || n ? `<button class="sub" id="go-r" style="width:100%">${rr ? `復習の続きから（${rr.res.length + 1}問目）` : `復習：まちがえた天気図を読み直す <small class="badge">${Math.min(n, RVN)}問</small>`}</button>` : ""; })()}
     <div class="row"><button class="sub" id="go-cal" aria-label="カレンダー${late.length ? `（あとから遊べる日 ${late.length}）` : ""}">カレンダー${late.length ? ` <small class="badge">▶${late.length}</small>` : ""}</button><button class="sub" id="go-ach">実績 ${ag}/${ACH.length}</button></div>
-    <div class="stats">${streak(s.days) >= 1 ? `<div><b>${streak(s.days)}</b><small>連続の日</small></div>` : `<div><b>${tally(s).perfect}</b><small>全問正解の日</small></div>`}<div><b>${Object.keys(s.days).length}</b><small>遊んだ日</small></div><div><b>${s.ok}</b><small>正解</small></div></div>
-    <p class="rank">称号：${rankOf(s.ok)}${nr ? `（あと${nr[0] - s.ok}問で${nr[1]}）` : ""}</p>
+    ${newbie ? "" : `<div class="stats">${streak(s.days) >= 1 ? `<div><b>${streak(s.days)}</b><small>連続の日</small></div>` : `<div><b>${tally(s).perfect}</b><small>全問正解の日</small></div>`}<div><b>${Object.keys(s.days).length}</b><small>遊んだ日</small></div><div><b>${s.ok}</b><small>正解</small></div></div>
+    <p class="rank">称号：${rankOf(s.ok)}${nr ? `（あと${nr[0] - s.ok}問で${nr[1]}）` : ""}</p>`}
     ${footer()}`;
   $("go-d").onclick = () => (k !== todayKey() ? home() : done ? result("d", k) : startRun("d")); // 画面を開いたまま0時を過ぎたら、今日の状態に描き直す
   if ($("go-h")) $("go-h").onclick = () => (hdone ? result("h", k) : k === todayKey() ? startRun("h") : home()); // 画面を開いたまま0時を過ぎたら、翌日の上級は始めない
@@ -579,7 +591,7 @@ function play() {
     <p class="q" data-a11y-say>${esc(q.ask)}</p>
     <div class="ch${q.choices.length === 8 ? " c8" : ""}" id="ch">${q.choices.map((c) => `<button data-c="${esc(c)}">${esc(c)}</button>`).join("")}</div>
     <div id="after"></div>
-    ${en ? `<p class="note">まちがえても続けられます。「ここで降りる」まで何問でも。</p><button class="sub" id="quit" style="width:100%">ここで降りる（${nok}問で終える）</button>` : ""}`;
+    ${en ? `<p class="note" id="enote">まちがえても続けられます。「ここで降りる」まで何問でも。</p><button class="sub" id="quit" style="width:100%">ここで降りる（${nok}問で終える）</button>` : ""}`;
   $("back").onclick = home;
   if ($("quit")) $("quit").onclick = () => finish();
   $("ch").querySelectorAll("button").forEach((b) => (b.onclick = () => answer(b.dataset.c)));
@@ -596,9 +608,9 @@ function answer(c) {
   // 答え合わせ：天気図に風の流れと、聞いた地点の風・天気を重ねる（なぜその答えかが絵で分かる）
   const svg = $("mp") && $("mp").querySelector("svg"); if (svg && !$("wl")) { svg.insertAdjacentHTML("beforeend", windLayer(cur.q)); $("wleg").hidden = false; }
   const r = s.runs[MODE], fin = doneOf(r), en = r && r.mode === "e";
-  if (en && $("quit")) $("quit").hidden = true;
+  if (en && $("quit")) { $("quit").hidden = true; $("enote").hidden = true; } // 答えたあとは知らせ（#etk）と「次の問題へ」だけにする
   const tk = en && !ok ? `<p class="note" id="etk">まちがえても、とことんは続きます</p>` : "";
-  $("after").innerHTML = `<div class="verdict" role="status" data-a11y-say><div class="hd">${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
+  $("after").innerHTML = `<div class="verdict ${ok ? "ok" : "ng"}" role="status" data-a11y-say><div class="hd"><span class="vm" aria-hidden="true">${ok ? "✓" : "✕"}</span>${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
   $("next").onclick = play;
   setTimeout(() => { if ($("next") && cur.done) $("next").scrollIntoView({ behavior: calm() ? "auto" : "smooth", block: "nearest" }); }, 60);
 }
@@ -666,7 +678,6 @@ function result(mode, k, first, prec, newAch = []) {
     <p class="big">${all ? "全問正解！" : `${rec.r.length}問中 ${n}問 正解`}</p>
     ${newAch.length ? `<p class="achnew" id="achnew">${newAch.map((id) => `🏅 実績：${ACH.find((a) => a[0] === id)[1]}`).join("<br>")}</p>` : ""}
     ${(() => { const nx = nextAch(s); return nx ? `<p class="achnext" id="achnext">🎯 次の実績「${nx.name}」まで あと${nx.left}（${nx.n}/${nx.goal}）</p>` : ""; })()}
-    <div class="res">${list.map((it, j) => { const q = qOf(it); return `<div><span>${NAME[it.t]}：${esc(q.ask)}<br><small style="color:var(--ink2)">答え：${esc(q.ans)}${mode === "h" ? `　${esc(q.why)}` : ""}</small></span><b>${rec.r[j] ? "○" : "×"}</b></div>`; }).join("")}</div>
     ${(() => { const left = missOf(s).length, wrong = rec.r.length - n; return mode === "r" ? `<p class="note" id="rvnote">正解した天気図は復習から消えました。${left ? `まちがえた天気図は、あしたもう一度出ます（残り${left}問）。` : "復習はぜんぶ読み直せました。"}</p>` : wrong ? `<p class="note" id="rvnote">まちがえた${wrong}問は、あしたから「復習」で読み直せます。</p>` : ""; })()}
     ${late ? `<p class="note">${unsaved ? "この日は今日の5問の記録があるので、あとからの記録には残しません。" : "あとから遊んだ日は、カレンダーに ↺ で残ります（連続の日には数えません）。"}</p><button class="main alt" id="go-cal">カレンダーへ</button>` : ""}
     ${!free && !late ? `<div class="share">${esc(text)}</div>
@@ -674,7 +685,9 @@ function result(mode, k, first, prec, newAch = []) {
     <div class="shares"><a id="toX" target="_blank" rel="noopener">Xで投稿</a><a id="toLine" target="_blank" rel="noopener">LINEで送る</a><button id="copy">コピー</button></div>
     <p class="note">🟩正解　🟥はずれ<br>次の5問まで あと <b>${untilNext()}</b></p>` : ""}
     ${!free ? `<button class="main" id="go-e">続けて遊ぶ：とことん${s.ebest ? `（ベスト ${s.ebest}問）` : ""}</button>` : ""}
-    ${mode === "d" && k === todayKey() && !s.hdays[k] ? `<button class="main alt" id="go-h">上級：8方位の風向きと天気に挑む</button>` : ""}
+    ${mode === "d" && k === todayKey() && !s.hdays[k] ? `<button class="main alt" id="go-h">上級：8方位の風向きと天気</button>` : ""}
+    <p class="rh">ふりかえり</p>
+    <div class="res">${list.map((it, j) => { const q = qOf(it); return `<div class="${rec.r[j] ? "ok" : "ng"}"><span>${NAME[it.t]}：${esc(q.ask)}<br><small style="color:var(--ink2)">答え：${esc(q.ans)}${mode === "h" ? `　${esc(q.why)}` : ""}</small></span><b class="rm" role="img" aria-label="${rec.r[j] ? "正解" : "まちがい"}">${rec.r[j] ? "✓" : "✕"}</b></div>`; }).join("")}</div>
     <div class="row"><button class="sub" id="go-p">練習する</button><button class="sub" id="go-dex">読めた数を見る</button></div>
     ${showKofi ? `<p class="note kofi">楽しめたら、<a href="https://ko-fi.com/satouaaaaa" target="_blank" rel="noopener">Ko-fi でコーヒー1杯の応援</a>をもらえると、新しいゲームづくりの励みになります（任意・遊ぶのはずっと無料）。</p>` : ""}
     <p class="note"><a href="${FEEDBACK}" target="_blank" rel="noopener">感想を送る</a></p>`;

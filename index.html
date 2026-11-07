@@ -445,6 +445,7 @@ function bindFooter() { const h = $("f-how"); if (h) h.onclick = (e) => { e.prev
 function openHow() { $("fb2").href = FEEDBACK; const d = $("howto"); if (d.showModal) d.showModal(); else d.setAttribute("open", ""); }
 $("howto-ok").onclick = () => { const d = $("howto"); d.close ? d.close() : d.removeAttribute("open"); save((s) => { s.tut = true; }); };
 $("howto").addEventListener("close", () => { if (!load().tut) save((s) => { s.tut = true; }); }); // Esc で閉じても、次から遊び方を自動で開かない
+$("howto").addEventListener("cancel", () => { if (!load().tut) save((s) => { s.tut = true; }); }); // Esc のその場でも残す（close が届く前に読み直すと遊び方がまた出る。shared-workflows #196）
 $("howto-guide").onclick = (e) => { e.preventDefault(); $("howto-ok").onclick(); guide(); };
 
 // 等圧線：ます目で気圧を計り、4hPa ごとの線を引く（マーチングスクエア）

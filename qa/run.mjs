@@ -497,6 +497,8 @@ try {
     await pe.waitForFunction(() => document.getElementById("howto").open); // 窓が開いてから Esc を押す（開く前に押すと何も起きない）
     await pe.keyboard.press("Escape");
     check("遊び方を Esc で閉じても、次に開いたときは遊び方を出さない", await pe.waitForFunction(() => !document.getElementById("howto").open && window.__tk.load().tut === true, null, { timeout: 3000 }).then(() => true, () => false));
+    { let back = 0; for (let i = 0; i < 10; i++) { const pq = await newPage(); await pq.waitForFunction(() => document.getElementById("howto").open); await pq.keyboard.press("Escape"); await pq.reload(); if (await pq.evaluate(() => document.getElementById("howto").open)) back++; await pq.close(); }
+      check("遊び方を Esc で閉じてすぐ読み直しても、遊び方が出ない（10回。cancel でも残す。shared-workflows #196）", back === 0, `${back}/10`); }
     await pe.reload();
     check("（続き）開き直しても遊び方は閉じたまま", !(await pe.evaluate(() => document.getElementById("howto").open)));
     await pe.click("#f-how"); await pe.click("#howto-guide");

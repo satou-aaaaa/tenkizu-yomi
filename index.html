@@ -116,7 +116,7 @@ dialog h2{margin:0 0 10px;letter-spacing:.06em}
 dialog ol{padding-left:1.3em;margin:0 0 12px;line-height:1.8}
 dialog p{margin:0 0 10px;font-size:14px;line-height:1.7;color:var(--ink2)}
 dialog a{color:var(--route2);min-height:44px;display:inline-flex;align-items:center}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;z-index:9;box-shadow:0 6px 20px #0005;max-width:90%;text-align:center}
+.toast{pointer-events:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;z-index:9;box-shadow:0 6px 20px #0005;max-width:90%;text-align:center}
 footer{margin-top:auto;text-align:center;font-size:12px;color:var(--ink2);display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
 footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:center}
 /* 答えたあとに重ねる風の矢印（流れが見える）と、聞いた地点の太い矢印・天気の印 */
@@ -174,7 +174,7 @@ html.a11y-cvd .verdict.ng{border-color:#D55E00}html.a11y-cvd .verdict.ng .vm,htm
 </style>
 <!-- 引き継ぎコード（shared-workflows template/transfer.js の写し）。ゲームの script より前に置く -->
 <script src="transfer.js" data-game="tenkizu-yomi" data-keys="tenkizu-v1"></script>
-<!-- a11y:begin 見やすさの設定 v5（shared-workflows template/a11y/a11y.html の写し。ここでは直さず、ひな形を直して全部のゲームへ写す。drift-check と qa/a11y.mjs が同じ中身か見る） -->
+<!-- a11y:begin 見やすさの設定 v6（shared-workflows template/a11y/a11y.html の写し。ここでは直さず、ひな形を直して全部のゲームへ写す。drift-check と qa/a11y.mjs が同じ中身か見る） -->
 <style id="a11y-css">
 /* だれでも：キーボードで選んだ所に太い枠（WCAG 2.4.7・2.4.13） */
 :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline:3px solid #1a5fd0!important;outline-offset:2px!important;box-shadow:0 0 0 5px #fff!important}
@@ -192,6 +192,7 @@ html:not(.a11y-ruby) ruby.a11y-rb>rt{display:none}
 /* 設定の画面（どのゲームでも同じ見た目・同じ濃さ。白地に黒で 15:1） */
 .a11y-dlg{max-width:min(420px,calc(100vw - 32px));width:100%;box-sizing:border-box;border:2px solid #1d2320;border-radius:14px;padding:18px 16px 14px;background:#fffdf8;color:#1d2320;font:500 16px/1.6 "BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;letter-spacing:0}
 .a11y-dlg::backdrop{background:#0008}
+.a11y-dlg:not([open]){display:none}
 .a11y-dlg h2{font-size:19px;margin:0 0 4px;font-weight:700;line-height:1.4}
 .a11y-dlg p{margin:4px 0 10px;font-size:14px;color:#3d4440;line-height:1.6}
 .a11y-dlg label{display:flex;gap:12px;align-items:center;min-height:48px;padding:6px 4px;border-top:1px solid #1d232022;cursor:pointer;line-height:1.4}
@@ -290,7 +291,8 @@ html.a11y-say body{padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))!i
       set(k, e.target.checked);
       if (k === "say") dlg.querySelector("#a11y-novoice").hidden = !(e.target.checked && !voice());
     });
-    dlg.querySelector("[data-a11y-close]").addEventListener("click", () => dlg.close());
+    // dialog を知らないブラウザでは close が無いので、open を外して閉じ、フォーカスを戻す（v6。jitensha-rule #1・sekai-jikoku #1 の CodeRabbit）
+    dlg.querySelector("[data-a11y-close]").addEventListener("click", () => { if (dlg.close) dlg.close(); else { dlg.removeAttribute("open"); if (lastFocus && lastFocus.focus) lastFocus.focus(); } });
     dlg.addEventListener("close", () => { if (lastFocus && lastFocus.focus) lastFocus.focus(); });
     sayBtn = document.createElement("button");
     sayBtn.type = "button"; sayBtn.className = "a11y-saybtn"; sayBtn.textContent = "🔊 読む"; sayBtn.setAttribute("aria-label", "画面の問題を読み上げる");
@@ -648,7 +650,7 @@ function answer(c) {
   // 答え合わせ：天気図に風の流れと、聞いた地点の風・天気を重ねる（なぜその答えかが絵で分かる）
   const svg = $("mp") && $("mp").querySelector("svg"); if (svg && !$("wl")) { svg.insertAdjacentHTML("beforeend", windLayer(cur.q)); $("wleg").hidden = false; }
   const r = s.runs[MODE], fin = doneOf(r), en = r && r.mode === "e";
-  if (en && $("quit")) { $("quit").hidden = true; $("enote").hidden = true; } // 答えたあとは知らせ（#etk）と「次の問題へ」だけにする
+  if (en && $("quit")) { $("quit").textContent = `ここで降りる（${r.res.filter(Boolean).length}問で終える）`; $("enote").hidden = true; } // 答えたあとも「ここで降りる」は残し、数は正解した分を入れる（answer の中で保存済みなので endFinish が数える）。説明（#enote）は知らせ（#etk）に任せて隠す
   const tk = en && !ok ? `<p class="note" id="etk">まちがえても、とことんは続きます</p>` : "";
   $("after").innerHTML = `<div class="verdict ${ok ? "ok" : "ng"}" role="status" data-a11y-say><div class="hd"><span class="vm" aria-hidden="true">${ok ? "✓" : "✕"}</span>${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
   $("next").onclick = play;

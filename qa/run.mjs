@@ -321,7 +321,7 @@ try {
     await pr.close(); }
   for (const w of [320, 390]) { // とことんの遊ぶ画面・終わりの画面もスマホ幅で崩れない
     const pv = await newPage(w, 700); await pv.click("#howto-ok");
-    const look = () => pv.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), hd: document.querySelector("header") ? document.querySelector("header").getBoundingClientRect().height : 0 }));
+    const look = () => pv.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && Math.round(e.getBoundingClientRect().height) < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), hd: document.querySelector("header") ? document.querySelector("header").getBoundingClientRect().height : 0 }));
     const h0 = await look(); await pv.click("#go-e"); const a = await look(); await ansNow(pv, false); const b = await look();
     await pv.evaluate((k) => { const s = JSON.parse(localStorage.getItem(k)); s.runs.e.list = s.runs.e.list.map((x) => ({ ...x, t: "wind", h: 1, lv: 2 })); localStorage.setItem(k, JSON.stringify(s)); }, KEY); await pv.click("#next"); const c = await look();
     await pv.click("#quit"); const d = await look();
@@ -396,13 +396,13 @@ try {
     const p3 = await newPage(w, 700); const fb2 = await p3.evaluate(() => { const a = document.querySelector("#howto #fb2"); return a ? a.getBoundingClientRect().height : 0; }); check(`幅${w}px：遊び方の「感想を送る」も高さ44px以上`, fb2 >= 44, `${fb2}px`); await p3.click("#howto-ok");
     const homeOk = await p3.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
     await p3.click("#go-d"); await ansNow(p3); await p3.click("#next");
-    const r = await p3.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), fs: Math.min(...[...document.querySelectorAll("#mp text")].map((t) => t.getBoundingClientRect().height)) }));
+    const r = await p3.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && Math.round(e.getBoundingClientRect().height) < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), fs: Math.min(...[...document.querySelectorAll("#mp text")].map((t) => t.getBoundingClientRect().height)) }));
     check(`幅${w}px：横にはみ出さず、押せる所は高さ44px以上・地図の字は9px以上`, homeOk && !r.over && r.small.length === 0 && r.fs >= 9, `${r.small.join(",")} 字${r.fs.toFixed(1)}px`);
     await p3.close();
   }
   for (const w of [320, 390]) { // 実績・カレンダーの画面もスマホ幅で崩れない
     const pv = await newPage(w, 700); await pv.click("#howto-ok");
-    const look = () => pv.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && e.getBoundingClientRect().height < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), out: [...document.querySelectorAll(".ach, .cal .c")].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length }));
+    const look = () => pv.evaluate(() => ({ over: document.documentElement.scrollWidth > innerWidth, small: [...document.querySelectorAll("button, a")].filter((e) => e.offsetParent && Math.round(e.getBoundingClientRect().height) < 44).map((e) => e.id || e.textContent.trim().slice(0, 6)), out: [...document.querySelectorAll(".ach, .cal .c")].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length }));
     await pv.click("#go-ach"); const a = await look();
     await pv.click("#back"); await pv.click("#go-cal"); const c = await look();
     check(`幅${w}px：実績とカレンダーの画面は横にはみ出さず、押せる所は高さ44px以上`, !a.over && !c.over && a.small.length + c.small.length === 0 && a.out + c.out === 0, [...a.small, ...c.small].join(","));

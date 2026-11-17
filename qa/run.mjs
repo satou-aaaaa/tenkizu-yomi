@@ -459,6 +459,22 @@ try {
     check("同じ問題の練習をやり直したら、前の回（終えたもの）と取り違えず新しい回を使う", await pn.evaluate((K) => { const g = window.__tk, s0 = g.load(), base = { mode: "p", date: "2000-01-01", list: [1], tags: [1], res: [], i: 0, hints: [] }; mem = JSON.stringify(Object.assign({}, s0, { t: 9, runs: { p: Object.assign({}, base, { id: "new" }) } })); localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: 5, runs: { p: Object.assign({}, base, { id: "old", res: [{}], i: 1 }) } }))); const r = g.load(); mem = null; return r.runs.p.id === "new"; }, KEY));
     check("時計が戻っても、保存の時刻 t は前より大きくなる", await pn.evaluate((K) => { const s0 = JSON.parse(localStorage.getItem(K)); const far = Date.now() + 1e9; localStorage.setItem(K, JSON.stringify(Object.assign({}, s0, { t: far }))); save(() => {}); return JSON.parse(localStorage.getItem(K)).t > far; }, KEY));
     await pn.close(); }
+  // とことん：正解した直後（次へを押す前）でも「ここで降りる」が残っていて、押すと終われ、正解した1問が数に入る
+  {
+    const q = await newPage(); await q.click("#howto-ok"); await q.click("#go-e");
+    await ansNow(q); await q.waitForSelector(".verdict");
+    const lab = (await q.textContent("#quit")) || "", vis = await q.locator("#quit").isVisible();
+    await q.click("#quit"); await q.waitForTimeout(150);
+    check("とことん：正解した直後でも「ここで降りる」が見えていて、押すと結果へ進み、正解した1問が数に入る（ボタンの数も1問）", vis && lab.includes("1問で終える") && await q.locator("#eres").count() === 1 && (await q.textContent("#eres")).includes("1問") && (await q.evaluate(() => window.__tk.load().ebest)) === 1, lab);
+    await q.close();
+  }
+  // 知らせ（.toast）が出ているあいだも、その下のボタンを押せる（2026-11-17 全ゲームの点検。pointer-events:none）
+  {
+    const q = await newPage(); await q.click("#howto-ok");
+    const r = await q.evaluate(() => { const d = document.createElement("div"); d.className = "toast"; d.textContent = "知らせ"; document.body.appendChild(d); const b = d.getBoundingClientRect(), el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); const v = [getComputedStyle(d).pointerEvents, !!el && !d.contains(el)]; d.remove(); return v; });
+    check("知らせ（.toast）は押しても下のボタンに届く（pointer-events:none）", r[0] === "none" && r[1], r.join(","));
+    await q.close();
+  }
 } catch (e) {
   check("QA の操作が最後まで完了する", false, e.message.split("\n")[0]);
 } finally {

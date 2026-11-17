@@ -116,7 +116,7 @@ dialog h2{margin:0 0 10px;letter-spacing:.06em}
 dialog ol{padding-left:1.3em;margin:0 0 12px;line-height:1.8}
 dialog p{margin:0 0 10px;font-size:14px;line-height:1.7;color:var(--ink2)}
 dialog a{color:var(--route2);min-height:44px;display:inline-flex;align-items:center}
-.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;z-index:9;box-shadow:0 6px 20px #0005;max-width:90%;text-align:center}
+.toast{pointer-events:none;position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;z-index:9;box-shadow:0 6px 20px #0005;max-width:90%;text-align:center}
 footer{margin-top:auto;text-align:center;font-size:12px;color:var(--ink2);display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
 footer a{color:var(--ink2);min-height:44px;display:inline-flex;align-items:center}
 /* 答えたあとに重ねる風の矢印（流れが見える）と、聞いた地点の太い矢印・天気の印 */
@@ -648,7 +648,7 @@ function answer(c) {
   // 答え合わせ：天気図に風の流れと、聞いた地点の風・天気を重ねる（なぜその答えかが絵で分かる）
   const svg = $("mp") && $("mp").querySelector("svg"); if (svg && !$("wl")) { svg.insertAdjacentHTML("beforeend", windLayer(cur.q)); $("wleg").hidden = false; }
   const r = s.runs[MODE], fin = doneOf(r), en = r && r.mode === "e";
-  if (en && $("quit")) { $("quit").hidden = true; $("enote").hidden = true; } // 答えたあとは知らせ（#etk）と「次の問題へ」だけにする
+  if (en && $("quit")) { $("quit").textContent = `ここで降りる（${r.res.filter(Boolean).length}問で終える）`; $("enote").hidden = true; } // 答えたあとも「ここで降りる」は残し、数は正解した分を入れる（answer の中で保存済みなので endFinish が数える）。説明（#enote）は知らせ（#etk）に任せて隠す
   const tk = en && !ok ? `<p class="note" id="etk">まちがえても、とことんは続きます</p>` : "";
   $("after").innerHTML = `<div class="verdict ${ok ? "ok" : "ng"}" role="status" data-a11y-say><div class="hd"><span class="vm" aria-hidden="true">${ok ? "✓" : "✕"}</span>${ok ? "正解！" : `答えは「${esc(cur.q.ans)}」`}</div>${tk}${cur.hard ? "" : `<p class="why">${esc(whyOf(cur.q))}</p>`}<button class="main" id="next">${fin ? "結果を見る" : "次の問題へ"}</button></div>`;
   $("next").onclick = play;

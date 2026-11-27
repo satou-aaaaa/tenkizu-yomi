@@ -98,6 +98,8 @@ const G = T;
 }
 
 const html = readFileSync(path.join(root, "index.html"), "utf8");
+// ひな形の写し（<!-- 名前:begin〜end -->）はゲームの言葉ではないので外し、Core.kofi・Core.KOFI は写す前の形にもどして見る（shared-workflows の sync-template が足した）
+const gameOwn = (t) => t.replace(/<!-- ([a-z0-9-]+):begin[\s\S]*?<!-- \1:end -->/g, "").split("${Core.KOFI}").join("https://ko-fi.com/satouaaaaa").replace(/Core\.kofi\(("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\)/g, (m, a, b) => "`<p class=\"note kofi\">" + JSON.parse(a) + "、<a href=\"https://ko-fi.com/satouaaaaa\" target=\"_blank\" rel=\"noopener\">Ko-fi でコーヒー1杯の応援</a>をもらえると、" + JSON.parse(b) + "の励みになります（任意・遊ぶのはずっと無料）。</p>`");
 check("終えた回を消すのは同じ回のときだけ・0時を過ぎたホームの「今日」のボタンは描き直す（2026-11-04 CodeRabbit）", /c\.date === run\.date && c\.id === run\.id\) s2\.runs\[MODE\] = null/.test(html) && /\$\("go-d"\)\.onclick = \(\) => \(k !== todayKey\(\) \? home\(\)/.test(html));
 check("別のタブで今日の分を終えたあと、古い画面から今日・上級をもう一度始めない（2026-11-04 CodeRabbit）", /\(mode === "d" && s\.days\[k\]\) \|\| \(mode === "h" && s\.hdays\[k\]\)\) return;/.test(html));
 check("README の URL のすぐ後ろに全角の字を続けない（Link check が URL の一部と読む。2026-11-04）", !/https?:\/\/[\x21-\x7e]*[^\x00-\x7f]/.test(readFileSync(new URL("../README.md", import.meta.url), "utf8").replace(/\]\(https?:\/\/[^)\s]+\)/g, "").replace(/<https?:\/\/[^>\s]+>/g, "")));
@@ -198,7 +200,7 @@ try {
   const share = await page.textContent(".share");
   const asks = await page.evaluate(() => { const g = window.__tk; return g.dailyList(g.todayKey()).map(g.qOf).flatMap((q) => q.pts); });
   check("5問で結果・シェアの文は番号と色と点だけ（地名を出さない）", /天気図よみ #\d+/.test(share) && /🟥🟩🟩🟩🟩 4\/5/.test(share) && !asks.some((p) => share.includes(p)));
-  check("X・LINE は押したときに開くリンクだけ", /^https:\/\/twitter\.com\/intent\/tweet\?text=/.test(await page.getAttribute("#toX", "href")) && /^https:\/\/line\.me\/R\/share\?text=/.test(await page.getAttribute("#toLine", "href")));
+  check("X・LINE は押したときに開くリンクだけ", /^https:\/\/(?:x|twitter)\.com\/intent\/tweet\?text=/.test(await page.getAttribute("#toX", "href")) && /^https:\/\/line\.me\/R\/share\?text=/.test(await page.getAttribute("#toLine", "href")));
   check("結果に5問の答えが出る", (await page.locator(".res div").count()) === 5);
   check("今日の5問を初めて終えると、結果に「🏅 実績：はじめの1枚」が小さく出る", ((await page.locator("#achnew").textContent().catch(() => "")) || "").includes("🏅 実績：はじめの1枚"));
   check("結果に「あと少しの実績」を1つだけ出す：まだの実績のうち目標にいちばん近いもの（取った・0のものは選ばない。研究の要点 12）", await page.evaluate(() => { const g = window.__tk, s = g.load(), t = g.tally(s), nx = g.nextAch(s), el = document.querySelectorAll("#achnext"); if (!nx) return el.length === 0; const cand = g.ACH.filter((a) => t[a[4]] > 0 && t[a[4]] < a[5]); return el.length === 1 && el[0].textContent.includes(nx.name) && el[0].textContent.includes("あと" + nx.left) && cand.every((a) => t[a[4]] / a[5] <= nx.r + 1e-12) && !g.achGot(s).includes(nx.id); }) && await page.evaluate(() => window.__tk.nextAch(window.__tk.load()) !== null));
@@ -303,7 +305,7 @@ try {
   { // 好きなだけ遊べる：🎫・回数制限・「…すると開く」を入れない。上級ははじめて開いた日から（2026-11-06 satou さん。寄付で成り立たせるため）
     const pf = await newPage();
     const html = await pf.content(), src = readFileSync(path.join(root, "index.html"), "utf8");
-    check("ページに🎫・チケット・「…すると開く」が無い", !/🎫|チケット|すると開く|で開く|🔒/.test(src) && !/🎫|すると開く/.test(html));
+    check("ページに🎫・チケット・「…すると開く」が無い", !/🎫|チケット|すると開く|で開く|🔒/.test(src) && !/🎫|すると開く/.test(gameOwn(html)));
     await firstClose(pf);
     check("はじめて開いた日（今日の5問の前）でも、ホームから上級を始められる", (await pf.locator("#go-h").count()) === 1);
     await firstClose(pf); await pf.click("#go-h");
